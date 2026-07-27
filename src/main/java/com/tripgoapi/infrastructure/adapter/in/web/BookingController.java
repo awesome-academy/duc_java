@@ -6,6 +6,7 @@ import com.tripgoapi.application.port.in.CreateBookingUseCase;
 import com.tripgoapi.application.port.in.GetBookingDetailUseCase;
 import com.tripgoapi.application.port.in.GetBookingsUseCase;
 import com.tripgoapi.application.port.out.AuthenticatedPrincipal;
+import com.tripgoapi.domain.exception.InvalidBookingStatusException;
 import com.tripgoapi.domain.model.Booking;
 import com.tripgoapi.domain.model.BookingStatus;
 import com.tripgoapi.infrastructure.adapter.in.web.dto.ApiResult;
@@ -89,10 +90,12 @@ public class BookingController {
 
     @Operation(
             summary = "Danh sách đơn đặt tour của tôi",
-            description = "Lọc theo trạng thái qua query, vd: ?status=pending. Bỏ qua nếu không truyền hoặc giá trị không hợp lệ."
+            description = "Lọc theo trạng thái qua query, vd: ?status=pending. Bỏ qua nếu không truyền."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Thành công"),
+            @ApiResponse(responseCode = "422", description = "Giá trị status không hợp lệ",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai access token",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
@@ -151,13 +154,13 @@ public class BookingController {
     }
 
     private BookingStatus parseStatus(String status) {
-        if (status == null) {
+        if (status == null || status.isBlank()) {
             return null;
         }
         try {
             return BookingStatus.valueOf(status.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            return null;
+            throw new InvalidBookingStatusException(status);
         }
     }
 }

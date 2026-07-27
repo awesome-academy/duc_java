@@ -5,6 +5,7 @@ import com.tripgoapi.domain.exception.ForbiddenException;
 import com.tripgoapi.domain.exception.NotFoundException;
 import com.tripgoapi.domain.exception.TooManyRequestsException;
 import com.tripgoapi.domain.exception.UnauthorizedException;
+import com.tripgoapi.domain.exception.UnprocessableException;
 import com.tripgoapi.infrastructure.adapter.in.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
@@ -56,6 +57,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TooManyRequestsException.class)
     public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException ex, HttpServletRequest request) {
         return build(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(UnprocessableException.class)
+    public ResponseEntity<ErrorResponse> handleUnprocessable(UnprocessableException ex, HttpServletRequest request) {
+        return build(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(), request);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

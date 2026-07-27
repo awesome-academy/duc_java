@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -29,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -57,7 +59,7 @@ class CreateBookingServiceTest {
     void setUp() {
         // Every call goes through the idempotency check first; default to "not seen before"
         // unless a specific test overrides it.
-        when(bookingRepository.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
+        when(bookingRepository.findByUserIdAndIdempotencyKey(anyLong(), anyString())).thenReturn(Optional.empty());
     }
 
     private CreateBookingService newService() {
@@ -90,13 +92,30 @@ class CreateBookingServiceTest {
                 2, 0, BigDecimal.valueOf(200), BookingStatus.PENDING,
                 "Jane", "jane@example.com", "0900000000", OffsetDateTime.now()
         );
-        when(bookingRepository.findByIdempotencyKey(IDEMPOTENCY_KEY)).thenReturn(Optional.of(existing));
+        when(bookingRepository.findByUserIdAndIdempotencyKey(1L, IDEMPOTENCY_KEY)).thenReturn(Optional.of(existing));
 
         Booking result = service.createBooking(command(1L, 2, 0));
 
         assertThat(result).isSameAs(existing);
         verifyNoInteractions(tourDetailRepository, tourDepartureRepository);
         verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void createBooking_looksUpIdempotencyKeyScopedToTheCallingUser_notGlobally() {
+        // Regression for the IDOR: the lookup must be scoped by (userId, key) — never just the
+        // key alone — otherwise one user's client-generated key colliding with another user's
+        // (e.g. both submitting "1") would return someone else's booking instead of creating a
+        // new one.
+        service = newService();
+        when(tourDetailRepository.findById(TOUR_ID)).thenReturn(Optional.of(tourDetail(BigDecimal.valueOf(100), null)));
+        when(tourDepartureRepository.findDepartureId(TOUR_ID, DATE)).thenReturn(Optional.of(DEPARTURE_ID));
+        when(tourDepartureRepository.reserveSlots(DEPARTURE_ID, 2)).thenReturn(true);
+        when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createBooking(command(2L, 2, 0));
+
+        verify(bookingRepository).findByUserIdAndIdempotencyKey(2L, IDEMPOTENCY_KEY);
     }
 
     @Test
@@ -224,5 +243,43 @@ class CreateBookingServiceTest {
         assertThat(saved.status()).isEqualTo(BookingStatus.PENDING);
         assertThat(saved.contactEmail()).isEqualTo("jane@example.com");
         assertThat(saved.idempotencyKey()).isEqualTo(IDEMPOTENCY_KEY);
+    }
+
+    @Test
+    void lostDoubleSubmitRace_saveFailsOnUniqueConstraint_returnsWinnerBookingReadInNewTransaction() {
+        service = newService();
+        when(tourDetailRepository.findById(TOUR_ID)).thenReturn(Optional.of(tourDetail(BigDecimal.valueOf(100), null)));
+        when(tourDepartureRepository.findDepartureId(TOUR_ID, DATE)).thenReturn(Optional.of(DEPARTURE_ID));
+        when(tourDepartureRepository.reserveSlots(DEPARTURE_ID, 2)).thenReturn(true);
+        when(bookingRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+        Booking winner = new Booking(
+                9L, "TG-2026-000009", IDEMPOTENCY_KEY, 1L, TOUR_ID, "Da Nang Tour", "da-nang-tour", 3,
+                DEPARTURE_ID, DATE,
+                2, 0, BigDecimal.valueOf(200), BookingStatus.PENDING,
+                "Jane", "jane@example.com", "0900000000", OffsetDateTime.now()
+        );
+        when(bookingRepository.findByUserIdAndIdempotencyKeyInNewTransaction(1L, IDEMPOTENCY_KEY))
+                .thenReturn(Optional.of(winner));
+
+        Booking result = service.createBooking(command(1L, 2, 0));
+
+        assertThat(result).isSameAs(winner);
+    }
+
+    @Test
+    void saveFailsOnUniqueConstraint_butNoBookingFoundByKey_rethrowsOriginalException() {
+        // Covers the (extremely unlikely) case of the failure being an unrelated unique-constraint
+        // violation, e.g. a bookingCode UUID collision, not an idempotency-key race: there is no
+        // winner to return, so the original exception must propagate instead of being swallowed.
+        service = newService();
+        when(tourDetailRepository.findById(TOUR_ID)).thenReturn(Optional.of(tourDetail(BigDecimal.valueOf(100), null)));
+        when(tourDepartureRepository.findDepartureId(TOUR_ID, DATE)).thenReturn(Optional.of(DEPARTURE_ID));
+        when(tourDepartureRepository.reserveSlots(DEPARTURE_ID, 2)).thenReturn(true);
+        DataIntegrityViolationException ex = new DataIntegrityViolationException("duplicate key");
+        when(bookingRepository.save(any())).thenThrow(ex);
+        when(bookingRepository.findByUserIdAndIdempotencyKeyInNewTransaction(1L, IDEMPOTENCY_KEY))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createBooking(command(1L, 2, 0))).isSameAs(ex);
     }
 }

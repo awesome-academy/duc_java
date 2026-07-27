@@ -2,6 +2,7 @@ package com.tripgoapi.infrastructure.adapter.in.web;
 
 import com.tripgoapi.domain.exception.BookingAccessDeniedException;
 import com.tripgoapi.domain.exception.EmailAlreadyExistsException;
+import com.tripgoapi.domain.exception.InvalidBookingStatusException;
 import com.tripgoapi.domain.exception.InvalidCredentialsException;
 import com.tripgoapi.domain.exception.TooManyLoginAttemptsException;
 import com.tripgoapi.domain.exception.TourNotFoundException;
@@ -133,6 +134,15 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         // Deliberately generic — must not reveal whether the email exists or only the password was wrong.
         assertThat(response.getBody().message()).isEqualTo("Invalid email or password");
+    }
+
+    @Test
+    void unprocessableExceptionReturns422WithDomainMessage() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleUnprocessable(new InvalidBookingStatusException("pendign"), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody().message()).contains("pendign");
     }
 
     @Test

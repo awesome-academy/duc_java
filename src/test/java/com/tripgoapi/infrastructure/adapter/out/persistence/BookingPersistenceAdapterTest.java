@@ -118,7 +118,7 @@ class BookingPersistenceAdapterTest {
     }
 
     @Test
-    void findByIdempotencyKey_found_mapsEntity() {
+    void findByUserIdAndIdempotencyKey_found_mapsEntity() {
         adapter = newAdapter();
         BookingEntity entity = BookingEntity.builder()
                 .id(1L)
@@ -132,17 +132,42 @@ class BookingPersistenceAdapterTest {
                 .status("PENDING")
                 .createdAt(OffsetDateTime.now())
                 .build();
-        when(bookingJpaRepository.findByIdempotencyKeyWithDeparture("idem-key-1")).thenReturn(java.util.Optional.of(entity));
+        when(bookingJpaRepository.findByUserIdAndIdempotencyKeyWithDeparture(5L, "idem-key-1"))
+                .thenReturn(java.util.Optional.of(entity));
 
-        assertThat(adapter.findByIdempotencyKey("idem-key-1")).map(Booking::bookingCode).contains("TG-2026-000001");
+        assertThat(adapter.findByUserIdAndIdempotencyKey(5L, "idem-key-1"))
+                .map(Booking::bookingCode).contains("TG-2026-000001");
     }
 
     @Test
-    void findByIdempotencyKey_notFound_returnsEmpty() {
+    void findByUserIdAndIdempotencyKey_notFound_returnsEmpty() {
         adapter = newAdapter();
-        when(bookingJpaRepository.findByIdempotencyKeyWithDeparture("unknown")).thenReturn(java.util.Optional.empty());
+        when(bookingJpaRepository.findByUserIdAndIdempotencyKeyWithDeparture(5L, "unknown"))
+                .thenReturn(java.util.Optional.empty());
 
-        assertThat(adapter.findByIdempotencyKey("unknown")).isEmpty();
+        assertThat(adapter.findByUserIdAndIdempotencyKey(5L, "unknown")).isEmpty();
+    }
+
+    @Test
+    void findByUserIdAndIdempotencyKeyInNewTransaction_delegatesToTheSameScopedLookup() {
+        adapter = newAdapter();
+        BookingEntity entity = BookingEntity.builder()
+                .id(1L)
+                .bookingCode("TG-2026-000001")
+                .idempotencyKey("idem-key-1")
+                .user(UserEntity.builder().id(5L).build())
+                .tour(TourEntity.builder().id(2L).build())
+                .departure(TourDepartureEntity.builder().id(3L).departureDate(LocalDate.of(2026, 8, 15)).build())
+                .adults(2).children(0)
+                .totalPrice(BigDecimal.valueOf(200))
+                .status("PENDING")
+                .createdAt(OffsetDateTime.now())
+                .build();
+        when(bookingJpaRepository.findByUserIdAndIdempotencyKeyWithDeparture(5L, "idem-key-1"))
+                .thenReturn(java.util.Optional.of(entity));
+
+        assertThat(adapter.findByUserIdAndIdempotencyKeyInNewTransaction(5L, "idem-key-1"))
+                .map(Booking::bookingCode).contains("TG-2026-000001");
     }
 
     @Test

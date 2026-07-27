@@ -12,8 +12,11 @@ import com.tripgoapi.domain.exception.TourNotFoundException;
 import com.tripgoapi.domain.model.Booking;
 import com.tripgoapi.domain.model.TourDetail;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -30,8 +33,10 @@ public class CreateBookingService implements CreateBookingUseCase {
     @Transactional
     public Booking createBooking(CreateBookingCommand command) {
         // Idempotency: a retried request (client timeout/double-submit) with the same key
-        // returns the already-created booking instead of reserving slots a second time.
-        Optional<Booking> existing = bookingRepository.findByIdempotencyKey(command.idempotencyKey());
+        // returns the already-created booking instead of reserving slots a second time. Scoped
+        // to the caller's userId — the key is client-generated and only unique per user, so an
+        // unscoped lookup would let user B fetch user A's booking by guessing/colliding a key.
+        Optional<Booking> existing = bookingRepository.findByUserIdAndIdempotencyKey(command.userId(), command.idempotencyKey());
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -68,6 +73,22 @@ public class CreateBookingService implements CreateBookingUseCase {
                 command.contactPhone()
         );
 
-        return bookingRepository.save(booking);
+        try {
+            return bookingRepository.save(booking);
+        } catch (DataIntegrityViolationException ex) {
+            // Lost a double-submit race: a concurrent request with the same (userId,
+            // idempotencyKey) committed first, and Postgres aborted this transaction on the
+            // unique-constraint violation — no further statement can run in it. Mark it
+            // rollback-only (releasing the slots this losing request reserved) and hand the
+            // client the winner's booking instead of a raw 500, reading it in a fresh transaction
+            // since this one is now unusable. Guarded: only active when this method actually runs
+            // behind the @Transactional proxy (always true in production; not the case when a
+            // unit test calls the service directly with no Spring context).
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            }
+            return bookingRepository.findByUserIdAndIdempotencyKeyInNewTransaction(command.userId(), command.idempotencyKey())
+                    .orElseThrow(() -> ex);
+        }
     }
 }

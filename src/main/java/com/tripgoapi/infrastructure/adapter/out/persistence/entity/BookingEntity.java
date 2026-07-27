@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,7 +20,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "bookings")
+@Table(name = "bookings", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "idempotency_key"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,7 +35,7 @@ public class BookingEntity {
     @Column(name = "booking_code", nullable = false, unique = true)
     private String bookingCode;
 
-    @Column(name = "idempotency_key", nullable = false, unique = true)
+    @Column(name = "idempotency_key", nullable = false)
     private String idempotencyKey;
 
     @ManyToOne(fetch = FetchType.LAZY)

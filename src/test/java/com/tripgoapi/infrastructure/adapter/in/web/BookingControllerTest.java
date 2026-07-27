@@ -145,6 +145,52 @@ class BookingControllerTest {
     }
 
     @Test
+    void createBooking_contactNameOrEmailOverMaxLength_returns422_andNeverCallsUseCase() throws Exception {
+        // contact_name/contact_email are VARCHAR(255) in the DB — without @Size this would pass
+        // Bean Validation and only fail at the DB as an opaque 500.
+        String overlongBody = """
+                {
+                  "idempotencyKey": "idem-key-1",
+                  "tourId": 1,
+                  "date": "2026-08-15",
+                  "adults": 2,
+                  "children": 1,
+                  "contact": { "name": "%s", "email": "jane@example.com", "phone": "0900000000" }
+                }
+                """.formatted("A".repeat(256));
+
+        mockMvc.perform(post("/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(overlongBody))
+                .andExpect(status().isUnprocessableEntity());
+
+        verifyNoInteractions(createBookingUseCase);
+    }
+
+    @Test
+    void createBooking_idempotencyKeyOverMaxLength_returns422_andNeverCallsUseCase() throws Exception {
+        // idempotency_key is VARCHAR(100) in the DB — without @Size this would pass Bean
+        // Validation and only fail at insert time as a raw, misleading DataIntegrityViolationException.
+        String overlongBody = """
+                {
+                  "idempotencyKey": "%s",
+                  "tourId": 1,
+                  "date": "2026-08-15",
+                  "adults": 2,
+                  "children": 1,
+                  "contact": { "name": "Jane", "email": "jane@example.com", "phone": "0900000000" }
+                }
+                """.formatted("k".repeat(101));
+
+        mockMvc.perform(post("/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(overlongBody))
+                .andExpect(status().isUnprocessableEntity());
+
+        verifyNoInteractions(createBookingUseCase);
+    }
+
+    @Test
     void createBooking_success_returns201_withBookingBody_andUsesPrincipalUserId_notAnyClientValue() throws Exception {
         when(createBookingUseCase.createBooking(any(CreateBookingCommand.class))).thenReturn(sampleBooking());
 
@@ -234,10 +280,18 @@ class BookingControllerTest {
     }
 
     @Test
-    void getBookings_withInvalidStatusQueryParam_ignoresFilter() throws Exception {
+    void getBookings_withInvalidStatusQueryParam_returns422_andNeverCallsUseCase() throws Exception {
+        mockMvc.perform(get("/bookings").param("status", "not-a-status"))
+                .andExpect(status().isUnprocessableEntity());
+
+        verifyNoInteractions(getBookingsUseCase);
+    }
+
+    @Test
+    void getBookings_withBlankStatusQueryParam_treatedAsNoFilter() throws Exception {
         when(getBookingsUseCase.getBookingsForUser(eq(USER_ID), isNull())).thenReturn(List.of());
 
-        mockMvc.perform(get("/bookings").param("status", "not-a-status"))
+        mockMvc.perform(get("/bookings").param("status", ""))
                 .andExpect(status().isOk());
 
         verify(getBookingsUseCase).getBookingsForUser(USER_ID, null);

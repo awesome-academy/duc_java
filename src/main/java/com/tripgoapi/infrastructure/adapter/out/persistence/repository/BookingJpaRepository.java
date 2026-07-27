@@ -15,8 +15,10 @@ public interface BookingJpaRepository extends JpaRepository<BookingEntity, Long>
             + "WHERE b.user.id = :userId AND (:status IS NULL OR b.status = :status) ORDER BY b.createdAt DESC")
     List<BookingEntity> findByUserIdWithDeparture(@Param("userId") Long userId, @Param("status") String status);
 
-    @Query("SELECT b FROM BookingEntity b JOIN FETCH b.departure JOIN FETCH b.tour WHERE b.idempotencyKey = :idempotencyKey")
-    Optional<BookingEntity> findByIdempotencyKeyWithDeparture(@Param("idempotencyKey") String idempotencyKey);
+    @Query("SELECT b FROM BookingEntity b JOIN FETCH b.departure JOIN FETCH b.tour "
+            + "WHERE b.user.id = :userId AND b.idempotencyKey = :idempotencyKey")
+    Optional<BookingEntity> findByUserIdAndIdempotencyKeyWithDeparture(
+            @Param("userId") Long userId, @Param("idempotencyKey") String idempotencyKey);
 
     @Query("SELECT b FROM BookingEntity b JOIN FETCH b.departure JOIN FETCH b.tour WHERE b.id = :id")
     Optional<BookingEntity> findByIdWithDeparture(@Param("id") Long id);

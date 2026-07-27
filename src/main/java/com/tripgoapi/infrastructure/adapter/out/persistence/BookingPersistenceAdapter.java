@@ -10,6 +10,8 @@ import com.tripgoapi.infrastructure.adapter.out.persistence.entity.UserEntity;
 import com.tripgoapi.infrastructure.adapter.out.persistence.repository.BookingJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -70,8 +72,14 @@ public class BookingPersistenceAdapter implements BookingRepositoryInterface {
     }
 
     @Override
-    public Optional<Booking> findByIdempotencyKey(String idempotencyKey) {
-        return bookingJpaRepository.findByIdempotencyKeyWithDeparture(idempotencyKey).map(this::toDomain);
+    public Optional<Booking> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey) {
+        return bookingJpaRepository.findByUserIdAndIdempotencyKeyWithDeparture(userId, idempotencyKey).map(this::toDomain);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public Optional<Booking> findByUserIdAndIdempotencyKeyInNewTransaction(Long userId, String idempotencyKey) {
+        return findByUserIdAndIdempotencyKey(userId, idempotencyKey);
     }
 
     @Override

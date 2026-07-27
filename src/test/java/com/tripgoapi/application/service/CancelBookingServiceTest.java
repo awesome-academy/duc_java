@@ -88,6 +88,26 @@ class CancelBookingServiceTest {
     }
 
     @Test
+    void lostConcurrentCancelRace_errorMessageReflectsFreshStatus_notTheStaleSnapshot() {
+        // Regression: the first findById() read (PENDING) is taken before cancelIfCancellable
+        // runs; if the atomic UPDATE then loses the race (another request cancelled it first),
+        // the exception must report the booking's real current status (CANCELLED), not the
+        // stale PENDING snapshot taken before the race was decided.
+        service = new CancelBookingService(bookingRepository, tourDepartureRepository);
+        when(bookingRepository.findById(BOOKING_ID))
+                .thenReturn(Optional.of(booking(OWNER_ID, BookingStatus.PENDING)))
+                .thenReturn(Optional.of(booking(OWNER_ID, BookingStatus.CANCELLED)));
+        when(bookingRepository.cancelIfCancellable(BOOKING_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.cancelBooking(BOOKING_ID, OWNER_ID))
+                .isInstanceOf(BookingCancellationNotAllowedException.class)
+                .hasMessageContaining("CANCELLED")
+                .hasMessageNotContaining("PENDING");
+
+        verify(tourDepartureRepository, never()).releaseSlots(any(), anyInt());
+    }
+
+    @Test
     void pendingBookingOwnedByRequester_releasesSlots_andReturnsCancelledBooking() {
         service = new CancelBookingService(bookingRepository, tourDepartureRepository);
         Booking pending = booking(OWNER_ID, BookingStatus.PENDING);

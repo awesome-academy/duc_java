@@ -19,7 +19,21 @@ public interface BookingRepositoryInterface {
      */
     List<Booking> findByUserId(Long userId, BookingStatus status);
 
-    Optional<Booking> findByIdempotencyKey(String idempotencyKey);
+    /**
+     * Idempotency keys are client-generated and only unique per submitting user — never look
+     * this up without also constraining by userId, or one user's retried request could return
+     * another user's booking.
+     */
+    Optional<Booking> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
+
+    /**
+     * Same lookup as {@link #findByUserIdAndIdempotencyKey}, but always runs in a brand new
+     * transaction. Needed to recover after a failed {@link #save} caused by a concurrent request
+     * winning the same (userId, idempotencyKey) race: Postgres aborts the whole transaction on a
+     * unique-constraint violation, so no further statement can run in the caller's transaction
+     * until it rolls back.
+     */
+    Optional<Booking> findByUserIdAndIdempotencyKeyInNewTransaction(Long userId, String idempotencyKey);
 
     Optional<Booking> findById(Long id);
 

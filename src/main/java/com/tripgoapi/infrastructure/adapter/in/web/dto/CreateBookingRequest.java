@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
@@ -17,6 +18,7 @@ public record CreateBookingRequest(
         // a timeout) so a resubmitted request returns the original booking instead of creating
         // a duplicate and double-reserving slots.
         @NotBlank(message = "idempotencyKey không được để trống")
+        @Size(max = 100, message = "idempotencyKey tối đa 100 ký tự")
         String idempotencyKey,
 
         @NotNull(message = "tourId không được để trống")
