@@ -26,6 +26,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,8 +49,7 @@ import java.util.List;
 @Tag(name = "Tours", description = "Tìm kiếm, chi tiết, lịch khởi hành và đánh giá tour")
 public class TourController {
 
-    private static final int DEFAULT_REVIEW_PAGE_SIZE = 10;
-    private static final int MAX_REVIEW_PAGE_SIZE = 50;
+    private static final int MAX_PAGE_SIZE = 50;
 
     private final GetToursUseCase getToursUseCase;
     private final GetTourDetailUseCase getTourDetailUseCase;
@@ -66,15 +71,22 @@ public class TourController {
             @Parameter(description = "Từ khóa tìm theo tiêu đề tour") @RequestParam(required = false) String q,
             @Parameter(description = "Slug điểm đến", example = "da-nang") @RequestParam(required = false) String destination,
             @Parameter(description = "Slug loại hình tour", example = "bien") @RequestParam(required = false) String category,
-            @Parameter(description = "Giá tối thiểu") @RequestParam(required = false) BigDecimal minPrice,
-            @Parameter(description = "Giá tối đa") @RequestParam(required = false) BigDecimal maxPrice,
-            @Parameter(description = "Số ngày tour (khớp chính xác)") @RequestParam(required = false) Integer duration,
-            @Parameter(description = "Đánh giá tối thiểu, thang 5") @RequestParam(required = false) BigDecimal rating,
+            @Parameter(description = "Giá tối thiểu") @RequestParam(required = false)
+            @PositiveOrZero(message = "minPrice phải >= 0") BigDecimal minPrice,
+            @Parameter(description = "Giá tối đa") @RequestParam(required = false)
+            @PositiveOrZero(message = "maxPrice phải >= 0") BigDecimal maxPrice,
+            @Parameter(description = "Số ngày tour (khớp chính xác)") @RequestParam(required = false)
+            @Positive(message = "duration phải > 0") Integer duration,
+            @Parameter(description = "Đánh giá tối thiểu, thang 5") @RequestParam(required = false)
+            @DecimalMin(value = "0", message = "rating phải >= 0")
+            @DecimalMax(value = "5", message = "rating phải <= 5") BigDecimal rating,
             @Parameter(description = "Chỉ lấy tour nổi bật") @RequestParam(required = false) Boolean featured,
             @Parameter(description = "Kiểu sắp xếp: newest, price_asc, price_desc, rating_desc. Mặc định newest",
                     example = "price_asc") @RequestParam(required = false) String sort,
-            @Parameter(description = "Số trang, bắt đầu từ 1") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "Số phần tử mỗi trang, tối đa 50") @RequestParam(defaultValue = "12") int limit
+            @Parameter(description = "Số trang, bắt đầu từ 1") @RequestParam(defaultValue = "1")
+            @Min(value = 1, message = "page phải >= 1") int page,
+            @Parameter(description = "Số phần tử mỗi trang, tối đa 50") @RequestParam(defaultValue = "12")
+            @Min(value = 1, message = "limit phải >= 1") @Max(value = MAX_PAGE_SIZE, message = "limit phải <= 50") int limit
     ) {
         TourSearchQuery query = new TourSearchQuery(
                 q, destination, category, minPrice, maxPrice, duration, rating, featured,
@@ -101,7 +113,8 @@ public class TourController {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/{id}")
-    public ApiResult<TourDetailResponse> getTourDetail(@Parameter(description = "ID tour") @PathVariable Long id) {
+    public ApiResult<TourDetailResponse> getTourDetail(
+            @Parameter(description = "ID tour") @PathVariable @Positive(message = "id phải > 0") Long id) {
         return ApiResult.of(tourDetailWebMapper.toResponse(getTourDetailUseCase.getTourDetail(id)));
     }
 
@@ -118,7 +131,7 @@ public class TourController {
     })
     @GetMapping("/{id}/availability")
     public ApiResult<List<TourAvailabilityResponse>> getAvailability(
-            @Parameter(description = "ID tour") @PathVariable Long id,
+            @Parameter(description = "ID tour") @PathVariable @Positive(message = "id phải > 0") Long id,
             @Parameter(description = "Tháng cần xem, định dạng yyyy-MM. Mặc định tháng hiện tại", example = "2026-08")
             @RequestParam(required = false) String month
     ) {
@@ -137,17 +150,13 @@ public class TourController {
     })
     @GetMapping("/{id}/reviews")
     public TourReviewsResponse getReviews(
-            @Parameter(description = "ID tour") @PathVariable Long id,
-            @Parameter(description = "Số trang, bắt đầu từ 1") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "Số đánh giá mỗi trang, tối đa 50") @RequestParam(defaultValue = "10") int size
+            @Parameter(description = "ID tour") @PathVariable @Positive(message = "id phải > 0") Long id,
+            @Parameter(description = "Số trang, bắt đầu từ 1") @RequestParam(defaultValue = "1")
+            @Min(value = 1, message = "page phải >= 1") int page,
+            @Parameter(description = "Số đánh giá mỗi trang, tối đa 50") @RequestParam(defaultValue = "10")
+            @Min(value = 1, message = "size phải >= 1") @Max(value = MAX_PAGE_SIZE, message = "size phải <= 50") int size
     ) {
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.min(Math.max(size, 1), MAX_REVIEW_PAGE_SIZE);
-        if (size < 1) {
-            safeSize = DEFAULT_REVIEW_PAGE_SIZE;
-        }
-
-        TourReviewsResult result = getTourReviewsUseCase.getReviews(id, safePage, safeSize);
+        TourReviewsResult result = getTourReviewsUseCase.getReviews(id, page, size);
 
         return new TourReviewsResponse(
                 reviewWebMapper.toResponseList(result.reviews().data()),

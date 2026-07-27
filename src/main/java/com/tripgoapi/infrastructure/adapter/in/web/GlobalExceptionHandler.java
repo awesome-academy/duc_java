@@ -3,6 +3,8 @@ package com.tripgoapi.infrastructure.adapter.in.web;
 import com.tripgoapi.domain.exception.NotFoundException;
 import com.tripgoapi.infrastructure.adapter.in.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -13,8 +15,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.util.BindErrorUtils;
 
 import java.time.format.DateTimeParseException;
 import java.util.stream.Collectors;
@@ -34,14 +38,25 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "No endpoint found for " + request.getRequestURI(), request);
     }
 
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        log.warn("Type mismatch for parameter '{}' at {}: {}", ex.getName(), request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "Tham số không hợp lệ: " + ex.getName(), request);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException ex, HttpServletRequest request) {
+        log.warn("Missing required parameter '{}' at {}", ex.getParameterName(), request.getRequestURI());
+        return build(HttpStatus.BAD_REQUEST, "Thiếu tham số bắt buộc: " + ex.getParameterName(), request);
+    }
+
     @ExceptionHandler({
-            MethodArgumentTypeMismatchException.class,
-            MissingServletRequestParameterException.class,
             DateTimeParseException.class,
             HttpMessageNotReadableException.class
     })
     public ResponseEntity<ErrorResponse> handleBadRequest(Exception ex, HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+        log.warn("Bad request at {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "Sai định dạng dữ liệu", request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -49,6 +64,22 @@ public class GlobalExceptionHandler {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
                 .collect(Collectors.joining("; "));
+        return build(HttpStatus.BAD_REQUEST, message, request);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ErrorResponse> handleHandlerMethodValidation(HandlerMethodValidationException ex, HttpServletRequest request) {
+        String message = BindErrorUtils.resolveAndJoin(ex.getAllErrors());
+        log.warn("Validation failed at {}: {}", request.getRequestURI(), message);
+        return build(HttpStatus.BAD_REQUEST, message, request);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
+        String message = ex.getConstraintViolations().stream()
+                .map(ConstraintViolation::getMessage)
+                .collect(Collectors.joining("; "));
+        log.warn("Constraint violation at {}: {}", request.getRequestURI(), message);
         return build(HttpStatus.BAD_REQUEST, message, request);
     }
 

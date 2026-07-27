@@ -9,6 +9,7 @@ import com.tripgoapi.domain.exception.TourNotFoundException;
 import com.tripgoapi.domain.model.Review;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
@@ -20,10 +21,13 @@ public class GetTourReviewsService implements GetTourReviewsUseCase {
     private final ReviewRepositoryInterface reviewRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public TourReviewsResult getReviews(Long tourId, int page, int size) {
-        BigDecimal averageRating = tourDetailRepository.findRatingAvg(tourId)
-                .orElseThrow(() -> new TourNotFoundException(tourId));
+        if (!tourDetailRepository.existsActiveTour(tourId)) {
+            throw new TourNotFoundException(tourId);
+        }
 
+        BigDecimal averageRating = tourDetailRepository.findRatingAvg(tourId).orElse(BigDecimal.ZERO);
         PageResult<Review> reviews = reviewRepository.findReviews(tourId, page, size);
         return new TourReviewsResult(reviews, averageRating);
     }
