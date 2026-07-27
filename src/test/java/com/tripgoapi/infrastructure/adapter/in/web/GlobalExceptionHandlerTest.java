@@ -1,5 +1,8 @@
 package com.tripgoapi.infrastructure.adapter.in.web;
 
+import com.tripgoapi.domain.exception.EmailAlreadyExistsException;
+import com.tripgoapi.domain.exception.InvalidCredentialsException;
+import com.tripgoapi.domain.exception.TooManyLoginAttemptsException;
 import com.tripgoapi.domain.exception.TourNotFoundException;
 import com.tripgoapi.infrastructure.adapter.in.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -97,6 +100,32 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().message()).isEqualTo("Sai định dạng dữ liệu");
         assertThat(response.getBody().message()).doesNotContain("JSON parse error");
+    }
+
+    @Test
+    void conflictExceptionReturns409WithDomainMessage() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleConflict(new EmailAlreadyExistsException("jane@example.com"), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().message()).contains("jane@example.com");
+    }
+
+    @Test
+    void unauthorizedExceptionReturns401WithGenericCredentialsMessage() {
+        ResponseEntity<ErrorResponse> response = handler.handleUnauthorized(new InvalidCredentialsException(), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        // Deliberately generic — must not reveal whether the email exists or only the password was wrong.
+        assertThat(response.getBody().message()).isEqualTo("Invalid email or password");
+    }
+
+    @Test
+    void tooManyRequestsExceptionReturns429() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleTooManyRequests(new TooManyLoginAttemptsException(), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }
 
     @Test
