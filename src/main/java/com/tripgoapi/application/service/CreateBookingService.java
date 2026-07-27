@@ -57,7 +57,7 @@ public class CreateBookingService implements CreateBookingUseCase {
         Booking booking = Booking.pending(
                 command.idempotencyKey(),
                 command.userId(),
-                command.tourId(),
+                tour,
                 departureId,
                 command.date(),
                 command.adults(),

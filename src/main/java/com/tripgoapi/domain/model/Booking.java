@@ -10,6 +10,10 @@ public record Booking(
         String idempotencyKey,
         Long userId,
         Long tourId,
+        // Denormalized from the tour row, same pattern as departureDate below.
+        String tourTitle,
+        String tourSlug,
+        Integer tourDurationDays,
         Long departureId,
         LocalDate departureDate,
         int adults,
@@ -25,7 +29,7 @@ public record Booking(
     public static Booking pending(
             String idempotencyKey,
             Long userId,
-            Long tourId,
+            TourDetail tour,
             Long departureId,
             LocalDate departureDate,
             int adults,
@@ -36,8 +40,8 @@ public record Booking(
             String contactPhone
     ) {
         return new Booking(
-                null, null, idempotencyKey, userId, tourId, departureId, departureDate,
-                adults, children, totalPrice, BookingStatus.PENDING,
+                null, null, idempotencyKey, userId, tour.id(), tour.title(), tour.slug(), tour.durationDays(),
+                departureId, departureDate, adults, children, totalPrice, BookingStatus.PENDING,
                 contactName, contactEmail, contactPhone, null
         );
     }

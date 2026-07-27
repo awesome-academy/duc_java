@@ -1,6 +1,7 @@
 package com.tripgoapi.infrastructure.adapter.in.web;
 
 import com.tripgoapi.domain.exception.ConflictException;
+import com.tripgoapi.domain.exception.ForbiddenException;
 import com.tripgoapi.domain.exception.NotFoundException;
 import com.tripgoapi.domain.exception.TooManyRequestsException;
 import com.tripgoapi.domain.exception.UnauthorizedException;
@@ -40,6 +41,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex, HttpServletRequest request) {
+        return build(HttpStatus.FORBIDDEN, ex.getMessage(), request);
     }
 
     @ExceptionHandler(UnauthorizedException.class)

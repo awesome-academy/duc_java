@@ -1,10 +1,15 @@
 package com.tripgoapi.infrastructure.adapter.in.web;
 
+import com.tripgoapi.application.port.in.CancelBookingUseCase;
 import com.tripgoapi.application.port.in.CreateBookingCommand;
 import com.tripgoapi.application.port.in.CreateBookingUseCase;
+import com.tripgoapi.application.port.in.GetBookingDetailUseCase;
 import com.tripgoapi.application.port.in.GetBookingsUseCase;
 import com.tripgoapi.application.port.out.AuthenticatedPrincipal;
+import com.tripgoapi.domain.exception.BookingAccessDeniedException;
+import com.tripgoapi.domain.exception.BookingCancellationNotAllowedException;
 import com.tripgoapi.domain.exception.BookingGroupTooLargeException;
+import com.tripgoapi.domain.exception.BookingNotFoundException;
 import com.tripgoapi.domain.exception.NoAvailableSlotsException;
 import com.tripgoapi.domain.exception.TourDepartureNotFoundException;
 import com.tripgoapi.domain.exception.TourNotFoundException;
@@ -35,10 +40,13 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,13 +60,18 @@ class BookingControllerTest {
     private CreateBookingUseCase createBookingUseCase;
     @Mock
     private GetBookingsUseCase getBookingsUseCase;
+    @Mock
+    private GetBookingDetailUseCase getBookingDetailUseCase;
+    @Mock
+    private CancelBookingUseCase cancelBookingUseCase;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         BookingWebMapper bookingWebMapper = Mappers.getMapper(BookingWebMapper.class);
-        BookingController controller = new BookingController(createBookingUseCase, getBookingsUseCase, bookingWebMapper);
+        BookingController controller = new BookingController(
+                createBookingUseCase, getBookingsUseCase, getBookingDetailUseCase, cancelBookingUseCase, bookingWebMapper);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
@@ -95,9 +108,14 @@ class BookingControllerTest {
     }
 
     private Booking sampleBooking() {
+        return sampleBooking(USER_ID, BookingStatus.PENDING);
+    }
+
+    private Booking sampleBooking(Long userId, BookingStatus status) {
         return new Booking(
-                1L, "TG-2026-000001", "idem-key-1", USER_ID, 1L, 3L, LocalDate.of(2026, 8, 15),
-                2, 1, BigDecimal.valueOf(300), BookingStatus.PENDING,
+                1L, "TG-2026-000001", "idem-key-1", userId, 1L, "Da Nang Tour", "da-nang-tour", 3, 3L,
+                LocalDate.of(2026, 8, 15),
+                2, 1, BigDecimal.valueOf(300), status,
                 "Jane", "jane@example.com", "0900000000", OffsetDateTime.now()
         );
     }
@@ -193,13 +211,95 @@ class BookingControllerTest {
     }
 
     @Test
-    void getBookings_returnsListForCurrentPrincipal() throws Exception {
-        when(getBookingsUseCase.getBookingsForUser(USER_ID)).thenReturn(List.of(sampleBooking()));
+    void getBookings_returnsListForCurrentPrincipal_withTourSummary() throws Exception {
+        when(getBookingsUseCase.getBookingsForUser(eq(USER_ID), isNull())).thenReturn(List.of(sampleBooking()));
 
         mockMvc.perform(get("/bookings"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].bookingCode").value("TG-2026-000001"));
+                .andExpect(jsonPath("$.data[0].bookingCode").value("TG-2026-000001"))
+                .andExpect(jsonPath("$.data[0].tour.title").value("Da Nang Tour"))
+                .andExpect(jsonPath("$.data[0].tour.slug").value("da-nang-tour"));
 
-        verify(getBookingsUseCase).getBookingsForUser(USER_ID);
+        verify(getBookingsUseCase).getBookingsForUser(USER_ID, null);
+    }
+
+    @Test
+    void getBookings_withStatusQueryParam_parsesAndPassesStatusFilter() throws Exception {
+        when(getBookingsUseCase.getBookingsForUser(USER_ID, BookingStatus.PENDING)).thenReturn(List.of(sampleBooking()));
+
+        mockMvc.perform(get("/bookings").param("status", "pending"))
+                .andExpect(status().isOk());
+
+        verify(getBookingsUseCase).getBookingsForUser(USER_ID, BookingStatus.PENDING);
+    }
+
+    @Test
+    void getBookings_withInvalidStatusQueryParam_ignoresFilter() throws Exception {
+        when(getBookingsUseCase.getBookingsForUser(eq(USER_ID), isNull())).thenReturn(List.of());
+
+        mockMvc.perform(get("/bookings").param("status", "not-a-status"))
+                .andExpect(status().isOk());
+
+        verify(getBookingsUseCase).getBookingsForUser(USER_ID, null);
+    }
+
+    @Test
+    void getBookingDetail_ownedByCurrentPrincipal_returns200() throws Exception {
+        when(getBookingDetailUseCase.getBookingDetail(1L, USER_ID)).thenReturn(sampleBooking());
+
+        mockMvc.perform(get("/bookings/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bookingCode").value("TG-2026-000001"));
+    }
+
+    @Test
+    void getBookingDetail_notFound_returns404() throws Exception {
+        when(getBookingDetailUseCase.getBookingDetail(1L, USER_ID)).thenThrow(new BookingNotFoundException(1L));
+
+        mockMvc.perform(get("/bookings/1"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getBookingDetail_ownedByAnotherUser_returns403() throws Exception {
+        when(getBookingDetailUseCase.getBookingDetail(1L, USER_ID)).thenThrow(new BookingAccessDeniedException(1L));
+
+        mockMvc.perform(get("/bookings/1"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancelBooking_ownedByCurrentPrincipal_returns200_withCancelledStatus() throws Exception {
+        when(cancelBookingUseCase.cancelBooking(1L, USER_ID))
+                .thenReturn(sampleBooking(USER_ID, BookingStatus.CANCELLED));
+
+        mockMvc.perform(patch("/bookings/1/cancel"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    @Test
+    void cancelBooking_notFound_returns404() throws Exception {
+        when(cancelBookingUseCase.cancelBooking(1L, USER_ID)).thenThrow(new BookingNotFoundException(1L));
+
+        mockMvc.perform(patch("/bookings/1/cancel"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void cancelBooking_ownedByAnotherUser_returns403() throws Exception {
+        when(cancelBookingUseCase.cancelBooking(1L, USER_ID)).thenThrow(new BookingAccessDeniedException(1L));
+
+        mockMvc.perform(patch("/bookings/1/cancel"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancelBooking_alreadyCancelledOrCompleted_returns409() throws Exception {
+        when(cancelBookingUseCase.cancelBooking(1L, USER_ID))
+                .thenThrow(new BookingCancellationNotAllowedException(BookingStatus.COMPLETED));
+
+        mockMvc.perform(patch("/bookings/1/cancel"))
+                .andExpect(status().isConflict());
     }
 }

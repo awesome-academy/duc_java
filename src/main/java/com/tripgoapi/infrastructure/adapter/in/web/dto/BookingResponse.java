@@ -7,7 +7,7 @@ import java.time.OffsetDateTime;
 public record BookingResponse(
         Long id,
         String bookingCode,
-        Long tourId,
+        TourSummaryResponse tour,
         LocalDate departureDate,
         int adults,
         int children,

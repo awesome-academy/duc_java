@@ -26,14 +26,25 @@ class GetBookingsServiceTest {
     void getBookingsForUser_delegatesToRepository() {
         GetBookingsService service = new GetBookingsService(bookingRepository);
         Booking booking = new Booking(
-                1L, "TG-2026-000001", "idem-key-1", 5L, 2L, 3L, LocalDate.of(2026, 8, 15),
+                1L, "TG-2026-000001", "idem-key-1", 5L, 2L, "Da Nang Tour", "da-nang-tour", 3,
+                3L, LocalDate.of(2026, 8, 15),
                 2, 0, BigDecimal.valueOf(200), BookingStatus.PENDING,
                 "Jane", "jane@example.com", "0900000000", OffsetDateTime.now()
         );
-        when(bookingRepository.findByUserId(5L)).thenReturn(List.of(booking));
+        when(bookingRepository.findByUserId(5L, null)).thenReturn(List.of(booking));
 
-        List<Booking> result = service.getBookingsForUser(5L);
+        List<Booking> result = service.getBookingsForUser(5L, null);
 
         assertThat(result).containsExactly(booking);
+    }
+
+    @Test
+    void getBookingsForUser_passesStatusFilterThrough() {
+        GetBookingsService service = new GetBookingsService(bookingRepository);
+        when(bookingRepository.findByUserId(5L, BookingStatus.CANCELLED)).thenReturn(List.of());
+
+        service.getBookingsForUser(5L, BookingStatus.CANCELLED);
+
+        org.mockito.Mockito.verify(bookingRepository).findByUserId(5L, BookingStatus.CANCELLED);
     }
 }

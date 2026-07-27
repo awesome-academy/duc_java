@@ -3,6 +3,7 @@ package com.tripgoapi.application.service;
 import com.tripgoapi.application.port.in.GetBookingsUseCase;
 import com.tripgoapi.application.port.out.BookingRepositoryInterface;
 import com.tripgoapi.domain.model.Booking;
+import com.tripgoapi.domain.model.BookingStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +18,7 @@ public class GetBookingsService implements GetBookingsUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Booking> getBookingsForUser(Long userId) {
-        return bookingRepository.findByUserId(userId);
+    public List<Booking> getBookingsForUser(Long userId, BookingStatus status) {
+        return bookingRepository.findByUserId(userId, status);
     }
 }

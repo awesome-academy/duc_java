@@ -12,4 +12,10 @@ public interface TourDepartureRepositoryInterface {
      * @return true if there was enough remaining capacity and the reservation succeeded
      */
     boolean reserveSlots(Long departureId, int guestCount);
+
+    /**
+     * Atomically releases {@code guestCount} previously-reserved slots back to the departure
+     * (e.g. on booking cancellation).
+     */
+    void releaseSlots(Long departureId, int guestCount);
 }

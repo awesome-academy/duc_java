@@ -25,4 +25,9 @@ public class TourDeparturePersistenceAdapter implements TourDepartureRepositoryI
     public boolean reserveSlots(Long departureId, int guestCount) {
         return tourDepartureJpaRepository.reserveSlotsIfAvailable(departureId, guestCount) > 0;
     }
+
+    @Override
+    public void releaseSlots(Long departureId, int guestCount) {
+        tourDepartureJpaRepository.releaseSlots(departureId, guestCount);
+    }
 }

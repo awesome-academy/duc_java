@@ -85,7 +85,8 @@ class CreateBookingServiceTest {
     void idempotencyKeyAlreadyUsed_returnsExistingBooking_neverTouchesTourOrDepartureOrSaves() {
         service = newService();
         Booking existing = new Booking(
-                9L, "TG-2026-000009", IDEMPOTENCY_KEY, 1L, TOUR_ID, DEPARTURE_ID, DATE,
+                9L, "TG-2026-000009", IDEMPOTENCY_KEY, 1L, TOUR_ID, "Da Nang Tour", "da-nang-tour", 3,
+                DEPARTURE_ID, DATE,
                 2, 0, BigDecimal.valueOf(200), BookingStatus.PENDING,
                 "Jane", "jane@example.com", "0900000000", OffsetDateTime.now()
         );
@@ -215,6 +216,9 @@ class CreateBookingServiceTest {
         Booking saved = captor.getValue();
         assertThat(saved.userId()).isEqualTo(99L);
         assertThat(saved.tourId()).isEqualTo(TOUR_ID);
+        assertThat(saved.tourTitle()).isEqualTo("Da Nang Tour");
+        assertThat(saved.tourSlug()).isEqualTo("da-nang-tour");
+        assertThat(saved.tourDurationDays()).isEqualTo(3);
         assertThat(saved.departureId()).isEqualTo(DEPARTURE_ID);
         assertThat(saved.departureDate()).isEqualTo(DATE);
         assertThat(saved.status()).isEqualTo(BookingStatus.PENDING);

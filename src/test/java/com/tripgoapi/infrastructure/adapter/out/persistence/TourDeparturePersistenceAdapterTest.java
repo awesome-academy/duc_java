@@ -62,4 +62,13 @@ class TourDeparturePersistenceAdapterTest {
 
         assertThat(adapter.reserveSlots(42L, 3)).isFalse();
     }
+
+    @Test
+    void releaseSlots_delegatesToRepository() {
+        adapter = newAdapter();
+
+        adapter.releaseSlots(42L, 3);
+
+        org.mockito.Mockito.verify(tourDepartureJpaRepository).releaseSlots(42L, 3);
+    }
 }

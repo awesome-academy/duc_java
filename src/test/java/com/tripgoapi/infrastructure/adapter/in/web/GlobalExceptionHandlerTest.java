@@ -1,5 +1,6 @@
 package com.tripgoapi.infrastructure.adapter.in.web;
 
+import com.tripgoapi.domain.exception.BookingAccessDeniedException;
 import com.tripgoapi.domain.exception.EmailAlreadyExistsException;
 import com.tripgoapi.domain.exception.InvalidCredentialsException;
 import com.tripgoapi.domain.exception.TooManyLoginAttemptsException;
@@ -114,6 +115,15 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody().message()).contains("jane@example.com");
+    }
+
+    @Test
+    void forbiddenExceptionReturns403WithDomainMessage() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleForbidden(new BookingAccessDeniedException(1L), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody().message()).contains("id=1");
     }
 
     @Test

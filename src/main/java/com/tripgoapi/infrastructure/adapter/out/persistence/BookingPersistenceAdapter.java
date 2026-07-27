@@ -51,17 +51,37 @@ public class BookingPersistenceAdapter implements BookingRepositoryInterface {
         inserted.setBookingCode(generateBookingCode(inserted.getId(), inserted.getCreatedAt()));
         BookingEntity saved = bookingJpaRepository.save(inserted);
 
-        return toDomain(saved);
+        // Built from the input `booking`, not via toDomain(saved): saved.getTour()/.getUser()/
+        // .getDeparture() are stub entities holding only the FK id set above, so reading any
+        // other field off them (e.g. tour title) would silently come back null.
+        return new Booking(
+                saved.getId(), saved.getBookingCode(), booking.idempotencyKey(), booking.userId(), booking.tourId(),
+                booking.tourTitle(), booking.tourSlug(), booking.tourDurationDays(),
+                booking.departureId(), booking.departureDate(), booking.adults(), booking.children(),
+                booking.totalPrice(), booking.status(), booking.contactName(), booking.contactEmail(),
+                booking.contactPhone(), saved.getCreatedAt()
+        );
     }
 
     @Override
-    public List<Booking> findByUserId(Long userId) {
-        return bookingJpaRepository.findByUserIdWithDeparture(userId).stream().map(this::toDomain).toList();
+    public List<Booking> findByUserId(Long userId, BookingStatus status) {
+        return bookingJpaRepository.findByUserIdWithDeparture(userId, status == null ? null : status.name())
+                .stream().map(this::toDomain).toList();
     }
 
     @Override
     public Optional<Booking> findByIdempotencyKey(String idempotencyKey) {
         return bookingJpaRepository.findByIdempotencyKeyWithDeparture(idempotencyKey).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<Booking> findById(Long id) {
+        return bookingJpaRepository.findByIdWithDeparture(id).map(this::toDomain);
+    }
+
+    @Override
+    public boolean cancelIfCancellable(Long id) {
+        return bookingJpaRepository.cancelIfCancellable(id) > 0;
     }
 
     private String generateBookingCode(Long id, OffsetDateTime createdAt) {
@@ -75,6 +95,9 @@ public class BookingPersistenceAdapter implements BookingRepositoryInterface {
                 entity.getIdempotencyKey(),
                 entity.getUser().getId(),
                 entity.getTour().getId(),
+                entity.getTour().getTitle(),
+                entity.getTour().getSlug(),
+                entity.getTour().getDurationDays(),
                 entity.getDeparture().getId(),
                 entity.getDeparture().getDepartureDate(),
                 entity.getAdults(),
