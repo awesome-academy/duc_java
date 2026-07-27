@@ -1,5 +1,8 @@
 package com.tripgoapi.infrastructure.adapter.in.web;
 
+import com.tripgoapi.domain.exception.EmailAlreadyExistsException;
+import com.tripgoapi.domain.exception.InvalidCredentialsException;
+import com.tripgoapi.domain.exception.TooManyLoginAttemptsException;
 import com.tripgoapi.domain.exception.TourNotFoundException;
 import com.tripgoapi.infrastructure.adapter.in.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -100,6 +104,32 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void conflictExceptionReturns409WithDomainMessage() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleConflict(new EmailAlreadyExistsException("jane@example.com"), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().message()).contains("jane@example.com");
+    }
+
+    @Test
+    void unauthorizedExceptionReturns401WithGenericCredentialsMessage() {
+        ResponseEntity<ErrorResponse> response = handler.handleUnauthorized(new InvalidCredentialsException(), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        // Deliberately generic — must not reveal whether the email exists or only the password was wrong.
+        assertThat(response.getBody().message()).isEqualTo("Invalid email or password");
+    }
+
+    @Test
+    void tooManyRequestsExceptionReturns429() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleTooManyRequests(new TooManyLoginAttemptsException(), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    @Test
     void constraintViolationReturnsAggregatedFriendlyMessages() {
         // Thrown when a service/component annotated with method-level Bean Validation
         // (e.g. a future @Validated application service) rejects its arguments.
@@ -111,6 +141,19 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().message()).isEqualTo("page phải >= 1");
+    }
+
+    @Test
+    void dataIntegrityViolationReturns409_notAnUnhandled500() {
+        // Defense-in-depth: catches any unique-constraint violation that reaches the web layer
+        // without being translated to a domain ConflictException at the persistence boundary.
+        DataIntegrityViolationException ex =
+                new DataIntegrityViolationException("duplicate key value violates unique constraint \"users_email_key\"");
+
+        ResponseEntity<ErrorResponse> response = handler.handleDataIntegrityViolation(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().message()).doesNotContain("users_email_key");
     }
 
     @Test
