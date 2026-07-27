@@ -18,6 +18,10 @@ import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.core.MethodParameter;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
@@ -141,6 +145,26 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().message()).isEqualTo("page phải >= 1");
+    }
+
+    @Test
+    void methodArgumentNotValidReturns422_notMalformed400() throws NoSuchMethodException {
+        // 422, not 400: the request body is well-formed JSON, it just violates @Valid rules —
+        // distinct from malformed input (bad JSON/type), which stays 400 elsewhere.
+        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "request");
+        bindingResult.addError(new FieldError("request", "contact.email", "contact.email không hợp lệ"));
+        MethodParameter methodParameter =
+                new MethodParameter(GlobalExceptionHandlerTest.class.getDeclaredMethod("dummyMethod", Object.class), 0);
+        MethodArgumentNotValidException ex = new MethodArgumentNotValidException(methodParameter, bindingResult);
+
+        ResponseEntity<ErrorResponse> response = handler.handleValidation(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody().message()).contains("contact.email không hợp lệ");
+    }
+
+    @SuppressWarnings("unused")
+    private void dummyMethod(Object arg) {
     }
 
     @Test

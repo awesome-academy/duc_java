@@ -80,10 +80,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        // 422 (not 400): the JSON itself is well-formed, it just violates @Valid business rules
+        // on the request body — distinct from malformed input (bad JSON/type), which the
+        // handlers below keep at 400.
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
                 .collect(Collectors.joining("; "));
-        return build(HttpStatus.BAD_REQUEST, message, request);
+        return build(HttpStatus.UNPROCESSABLE_CONTENT, message, request);
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
