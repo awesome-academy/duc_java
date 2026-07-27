@@ -45,4 +45,9 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenRepositoryInt
     public void revokeAllForUser(Long userId) {
         refreshTokenJpaRepository.revokeAllForUser(userId);
     }
+
+    @Override
+    public int deleteExpiredOrStaleRevoked(OffsetDateTime now, OffsetDateTime revokedRetentionBefore) {
+        return refreshTokenJpaRepository.deleteExpiredOrStaleRevoked(now, revokedRetentionBefore);
+    }
 }

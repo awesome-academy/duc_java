@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -140,6 +141,19 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().message()).isEqualTo("page phải >= 1");
+    }
+
+    @Test
+    void dataIntegrityViolationReturns409_notAnUnhandled500() {
+        // Defense-in-depth: catches any unique-constraint violation that reaches the web layer
+        // without being translated to a domain ConflictException at the persistence boundary.
+        DataIntegrityViolationException ex =
+                new DataIntegrityViolationException("duplicate key value violates unique constraint \"users_email_key\"");
+
+        ResponseEntity<ErrorResponse> response = handler.handleDataIntegrityViolation(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().message()).doesNotContain("users_email_key");
     }
 
     @Test

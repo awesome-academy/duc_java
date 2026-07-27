@@ -25,17 +25,17 @@ public class LoginService implements LoginUseCase {
 
     @Override
     public AuthToken login(LoginCommand command) {
-        if (loginAttemptLimiter.isBlocked(command.email())) {
+        if (loginAttemptLimiter.isBlocked(command.email(), command.ipAddress())) {
             throw new TooManyLoginAttemptsException();
         }
 
         Optional<UserCredentials> credentials = userRepository.findCredentialsByEmail(command.email());
         if (credentials.isEmpty() || !passwordEncoder.matches(command.password(), credentials.get().passwordHash())) {
-            loginAttemptLimiter.onLoginFailed(command.email());
+            loginAttemptLimiter.onLoginFailed(command.email(), command.ipAddress());
             throw new InvalidCredentialsException();
         }
 
-        loginAttemptLimiter.onLoginSucceeded(command.email());
+        loginAttemptLimiter.onLoginSucceeded(command.email(), command.ipAddress());
         UserCredentials user = credentials.get();
         return authTokenIssuer.issue(user.id(), user.email(), user.role());
     }

@@ -88,4 +88,17 @@ class RefreshTokenPersistenceAdapterTest {
 
         verify(refreshTokenJpaRepository).revokeAllForUser(5L);
     }
+
+    @Test
+    void deleteExpiredOrStaleRevoked_delegatesToRepositoryAndReturnsCount() {
+        adapter = newAdapter();
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime revokedRetentionBefore = now.minusDays(7);
+        when(refreshTokenJpaRepository.deleteExpiredOrStaleRevoked(now, revokedRetentionBefore)).thenReturn(3);
+
+        int deleted = adapter.deleteExpiredOrStaleRevoked(now, revokedRetentionBefore);
+
+        assertThat(deleted).isEqualTo(3);
+        verify(refreshTokenJpaRepository).deleteExpiredOrStaleRevoked(now, revokedRetentionBefore);
+    }
 }

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
 public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEntity, Long> {
@@ -19,4 +20,11 @@ public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEnt
     @Modifying
     @Query("UPDATE RefreshTokenEntity r SET r.revoked = true WHERE r.user.id = :userId AND r.revoked = false")
     void revokeAllForUser(@Param("userId") Long userId);
+
+    @Modifying
+    @Query("DELETE FROM RefreshTokenEntity r WHERE r.expiresAt < :now "
+            + "OR (r.revoked = true AND r.createdAt < :revokedRetentionBefore)")
+    int deleteExpiredOrStaleRevoked(
+            @Param("now") OffsetDateTime now,
+            @Param("revokedRetentionBefore") OffsetDateTime revokedRetentionBefore);
 }

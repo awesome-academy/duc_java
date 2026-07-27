@@ -27,6 +27,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LoginServiceTest {
 
+    private static final String IP = "203.0.113.5";
+
     @Mock
     private UserRepositoryInterface userRepository;
     @Mock
@@ -45,9 +47,9 @@ class LoginServiceTest {
     @Test
     void blockedByRateLimiter_rejectsBeforeTouchingUserRepositoryOrPassword() {
         service = newService();
-        when(loginAttemptLimiter.isBlocked("jane@example.com")).thenReturn(true);
+        when(loginAttemptLimiter.isBlocked("jane@example.com", IP)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.login(new LoginCommand("jane@example.com", "whatever")))
+        assertThatThrownBy(() -> service.login(new LoginCommand("jane@example.com", "whatever", IP)))
                 .isInstanceOf(TooManyLoginAttemptsException.class);
 
         verifyNoInteractions(userRepository, passwordEncoder, authTokenIssuer);
@@ -58,13 +60,13 @@ class LoginServiceTest {
         // Message stays generic ("invalid email or password") so the failure path here is
         // indistinguishable from a wrong-password failure below — prevents user enumeration.
         service = newService();
-        when(loginAttemptLimiter.isBlocked("nobody@example.com")).thenReturn(false);
+        when(loginAttemptLimiter.isBlocked("nobody@example.com", IP)).thenReturn(false);
         when(userRepository.findCredentialsByEmail("nobody@example.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.login(new LoginCommand("nobody@example.com", "pw")))
+        assertThatThrownBy(() -> service.login(new LoginCommand("nobody@example.com", "pw", IP)))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(loginAttemptLimiter).onLoginFailed("nobody@example.com");
+        verify(loginAttemptLimiter).onLoginFailed("nobody@example.com", IP);
         verifyNoInteractions(authTokenIssuer);
     }
 
@@ -72,14 +74,14 @@ class LoginServiceTest {
     void wrongPassword_recordsFailureAndThrowsInvalidCredentials() {
         service = newService();
         UserCredentials credentials = new UserCredentials(1L, "Jane", "jane@example.com", "hashed", Role.USER);
-        when(loginAttemptLimiter.isBlocked("jane@example.com")).thenReturn(false);
+        when(loginAttemptLimiter.isBlocked("jane@example.com", IP)).thenReturn(false);
         when(userRepository.findCredentialsByEmail("jane@example.com")).thenReturn(Optional.of(credentials));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
 
-        assertThatThrownBy(() -> service.login(new LoginCommand("jane@example.com", "wrong")))
+        assertThatThrownBy(() -> service.login(new LoginCommand("jane@example.com", "wrong", IP)))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(loginAttemptLimiter).onLoginFailed("jane@example.com");
+        verify(loginAttemptLimiter).onLoginFailed("jane@example.com", IP);
         verifyNoInteractions(authTokenIssuer);
     }
 
@@ -88,15 +90,15 @@ class LoginServiceTest {
         service = newService();
         UserCredentials credentials = new UserCredentials(1L, "Jane", "jane@example.com", "hashed", Role.USER);
         AuthToken issued = new AuthToken("access", "refresh", "Bearer", 3600);
-        when(loginAttemptLimiter.isBlocked("jane@example.com")).thenReturn(false);
+        when(loginAttemptLimiter.isBlocked("jane@example.com", IP)).thenReturn(false);
         when(userRepository.findCredentialsByEmail("jane@example.com")).thenReturn(Optional.of(credentials));
         when(passwordEncoder.matches("correct", "hashed")).thenReturn(true);
         when(authTokenIssuer.issue(1L, "jane@example.com", Role.USER)).thenReturn(issued);
 
-        AuthToken result = service.login(new LoginCommand("jane@example.com", "correct"));
+        AuthToken result = service.login(new LoginCommand("jane@example.com", "correct", IP));
 
         assertThat(result).isSameAs(issued);
-        verify(loginAttemptLimiter).onLoginSucceeded("jane@example.com");
-        verify(loginAttemptLimiter, never()).onLoginFailed(anyString());
+        verify(loginAttemptLimiter).onLoginSucceeded("jane@example.com", IP);
+        verify(loginAttemptLimiter, never()).onLoginFailed(anyString(), anyString());
     }
 }

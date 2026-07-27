@@ -16,4 +16,12 @@ public interface RefreshTokenRepositoryInterface {
     boolean revokeIfActive(String tokenHash);
 
     void revokeAllForUser(Long userId);
+
+    /**
+     * Purges rows that no longer serve any purpose: tokens past {@code now} (dead regardless
+     * of revoked state), and revoked tokens created before {@code revokedRetentionBefore}
+     * (kept briefly for audit/incident review, then purged even if not yet expired).
+     * @return number of rows deleted
+     */
+    int deleteExpiredOrStaleRevoked(OffsetDateTime now, OffsetDateTime revokedRetentionBefore);
 }

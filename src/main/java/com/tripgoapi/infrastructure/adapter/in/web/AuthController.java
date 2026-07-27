@@ -24,6 +24,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -71,8 +72,15 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/login")
-    public ApiResult<AuthTokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        AuthToken token = loginUseCase.login(new LoginCommand(request.email(), request.password()));
+    public ApiResult<AuthTokenResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        // getRemoteAddr() is the direct TCP peer, deliberately not X-Forwarded-For: trusting a
+        // client-suppliable header without a verified trusted-proxy hop in front would let an
+        // attacker spoof any IP and dodge/weaponize the rate limiter. If this app is ever
+        // deployed behind a reverse proxy/load balancer, that proxy must be configured to set
+        // this ITSELF (e.g. via server.forward-headers-strategy + a trusted-proxy allowlist) —
+        // otherwise every client will collapse into the proxy's single IP for rate-limiting.
+        LoginCommand command = new LoginCommand(request.email(), request.password(), httpRequest.getRemoteAddr());
+        AuthToken token = loginUseCase.login(command);
         return ApiResult.of(toResponse(token));
     }
 

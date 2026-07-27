@@ -56,6 +56,9 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        // Cost 12 instead of the library default (10): BCrypt encodes its cost factor in the
+        // hash itself, so this only raises the work factor for newly-encoded passwords —
+        // existing hashes at a lower cost still verify fine.
+        return new BCryptPasswordEncoder(12);
     }
 }

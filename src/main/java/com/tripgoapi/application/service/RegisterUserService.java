@@ -8,6 +8,7 @@ import com.tripgoapi.domain.exception.EmailAlreadyExistsException;
 import com.tripgoapi.domain.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,7 @@ public class RegisterUserService implements RegisterUserUseCase {
     private final PasswordEncoderPort passwordEncoder;
 
     @Override
+    @Transactional
     public User register(RegisterUserCommand command) {
         if (userRepository.existsByEmail(command.email())) {
             throw new EmailAlreadyExistsException(command.email());
