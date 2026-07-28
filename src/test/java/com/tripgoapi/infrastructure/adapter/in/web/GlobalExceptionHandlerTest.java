@@ -1,6 +1,8 @@
 package com.tripgoapi.infrastructure.adapter.in.web;
 
+import com.tripgoapi.domain.exception.BookingAccessDeniedException;
 import com.tripgoapi.domain.exception.EmailAlreadyExistsException;
+import com.tripgoapi.domain.exception.InvalidBookingStatusException;
 import com.tripgoapi.domain.exception.InvalidCredentialsException;
 import com.tripgoapi.domain.exception.TooManyLoginAttemptsException;
 import com.tripgoapi.domain.exception.TourNotFoundException;
@@ -18,6 +20,10 @@ import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.core.MethodParameter;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
@@ -113,12 +119,30 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void forbiddenExceptionReturns403WithDomainMessage() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleForbidden(new BookingAccessDeniedException(1L), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody().message()).contains("id=1");
+    }
+
+    @Test
     void unauthorizedExceptionReturns401WithGenericCredentialsMessage() {
         ResponseEntity<ErrorResponse> response = handler.handleUnauthorized(new InvalidCredentialsException(), request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         // Deliberately generic — must not reveal whether the email exists or only the password was wrong.
         assertThat(response.getBody().message()).isEqualTo("Invalid email or password");
+    }
+
+    @Test
+    void unprocessableExceptionReturns422WithDomainMessage() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleUnprocessable(new InvalidBookingStatusException("pendign"), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody().message()).contains("pendign");
     }
 
     @Test
@@ -141,6 +165,26 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().message()).isEqualTo("page phải >= 1");
+    }
+
+    @Test
+    void methodArgumentNotValidReturns422_notMalformed400() throws NoSuchMethodException {
+        // 422, not 400: the request body is well-formed JSON, it just violates @Valid rules —
+        // distinct from malformed input (bad JSON/type), which stays 400 elsewhere.
+        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "request");
+        bindingResult.addError(new FieldError("request", "contact.email", "contact.email không hợp lệ"));
+        MethodParameter methodParameter =
+                new MethodParameter(GlobalExceptionHandlerTest.class.getDeclaredMethod("dummyMethod", Object.class), 0);
+        MethodArgumentNotValidException ex = new MethodArgumentNotValidException(methodParameter, bindingResult);
+
+        ResponseEntity<ErrorResponse> response = handler.handleValidation(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody().message()).contains("contact.email không hợp lệ");
+    }
+
+    @SuppressWarnings("unused")
+    private void dummyMethod(Object arg) {
     }
 
     @Test

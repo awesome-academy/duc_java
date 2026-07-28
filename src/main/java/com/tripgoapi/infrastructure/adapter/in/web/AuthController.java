@@ -54,7 +54,7 @@ public class AuthController {
             @ApiResponse(responseCode = "201", description = "Tạo tài khoản thành công"),
             @ApiResponse(responseCode = "409", description = "Email đã được đăng ký",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ",
+            @ApiResponse(responseCode = "422", description = "Dữ liệu không hợp lệ",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/register")

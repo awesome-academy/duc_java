@@ -1,9 +1,11 @@
 package com.tripgoapi.infrastructure.adapter.in.web;
 
 import com.tripgoapi.domain.exception.ConflictException;
+import com.tripgoapi.domain.exception.ForbiddenException;
 import com.tripgoapi.domain.exception.NotFoundException;
 import com.tripgoapi.domain.exception.TooManyRequestsException;
 import com.tripgoapi.domain.exception.UnauthorizedException;
+import com.tripgoapi.domain.exception.UnprocessableException;
 import com.tripgoapi.infrastructure.adapter.in.web.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
@@ -42,6 +44,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex, HttpServletRequest request) {
+        return build(HttpStatus.FORBIDDEN, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException ex, HttpServletRequest request) {
         return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
@@ -50,6 +57,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TooManyRequestsException.class)
     public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException ex, HttpServletRequest request) {
         return build(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(UnprocessableException.class)
+    public ResponseEntity<ErrorResponse> handleUnprocessable(UnprocessableException ex, HttpServletRequest request) {
+        return build(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(), request);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -80,10 +92,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        // 422 (not 400): the JSON itself is well-formed, it just violates @Valid business rules
+        // on the request body — distinct from malformed input (bad JSON/type), which the
+        // handlers below keep at 400.
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
                 .collect(Collectors.joining("; "));
-        return build(HttpStatus.BAD_REQUEST, message, request);
+        return build(HttpStatus.UNPROCESSABLE_CONTENT, message, request);
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
