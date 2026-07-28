@@ -6,6 +6,7 @@ import com.tripgoapi.infrastructure.adapter.out.security.JwtAuthenticationFilter
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -28,7 +29,6 @@ public class SecurityConfig {
             "/auth/refresh",
             "/auth/logout",
             "/destinations/**",
-            "/tours/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**"
@@ -44,6 +44,9 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // GET-only: POST /tours/{id}/reviews needs the authenticated user's id,
+                        // so it must fall through to .anyRequest().authenticated() below.
+                        .requestMatchers(HttpMethod.GET, "/tours/**").permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(handling -> handling

@@ -2,12 +2,9 @@ package com.tripgoapi.infrastructure.adapter.in.web;
 
 import com.tripgoapi.application.port.in.GetTourAvailabilityUseCase;
 import com.tripgoapi.application.port.in.GetTourDetailUseCase;
-import com.tripgoapi.application.port.in.GetTourReviewsUseCase;
 import com.tripgoapi.application.port.in.GetToursUseCase;
 import com.tripgoapi.application.port.in.PageResult;
-import com.tripgoapi.application.port.in.TourReviewsResult;
 import com.tripgoapi.application.port.in.TourSearchQuery;
-import com.tripgoapi.infrastructure.mapper.ReviewWebMapper;
 import com.tripgoapi.infrastructure.mapper.TourAvailabilityWebMapper;
 import com.tripgoapi.infrastructure.mapper.TourDetailWebMapper;
 import com.tripgoapi.infrastructure.mapper.TourWebMapper;
@@ -20,13 +17,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -43,23 +37,19 @@ class TourControllerTest {
     @Mock
     private GetTourAvailabilityUseCase getTourAvailabilityUseCase;
     @Mock
-    private GetTourReviewsUseCase getTourReviewsUseCase;
-    @Mock
     private TourWebMapper tourWebMapper;
     @Mock
     private TourDetailWebMapper tourDetailWebMapper;
     @Mock
     private TourAvailabilityWebMapper tourAvailabilityWebMapper;
-    @Mock
-    private ReviewWebMapper reviewWebMapper;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         TourController controller = new TourController(
-                getToursUseCase, getTourDetailUseCase, getTourAvailabilityUseCase, getTourReviewsUseCase,
-                tourWebMapper, tourDetailWebMapper, tourAvailabilityWebMapper, reviewWebMapper
+                getToursUseCase, getTourDetailUseCase, getTourAvailabilityUseCase,
+                tourWebMapper, tourDetailWebMapper, tourAvailabilityWebMapper
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -126,26 +116,5 @@ class TourControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(getTourDetailUseCase);
-    }
-
-    @Test
-    void reviewsPageOutOfRange_isRejectedWith400_insteadOfSilentlyClamping() throws Exception {
-        // Reviews endpoint previously clamped page/size with manual Math.max/min in the
-        // controller; it now uses the same declarative validation as /tours for consistency.
-        mockMvc.perform(get("/tours/1/reviews").param("size", "51"))
-                .andExpect(status().isBadRequest());
-
-        verifyNoInteractions(getTourReviewsUseCase);
-    }
-
-    @Test
-    void reviewsValidPageAndSize_arePassedThroughUnchanged() throws Exception {
-        when(getTourReviewsUseCase.getReviews(anyLong(), anyInt(), anyInt()))
-                .thenReturn(new TourReviewsResult(new PageResult<>(List.of(), 0, 1, 10), BigDecimal.ZERO));
-
-        mockMvc.perform(get("/tours/1/reviews"))
-                .andExpect(status().isOk());
-
-        verify(getTourReviewsUseCase).getReviews(1L, 1, 10);
     }
 }

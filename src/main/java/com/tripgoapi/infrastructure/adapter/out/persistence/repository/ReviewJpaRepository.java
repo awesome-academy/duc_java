@@ -10,4 +10,6 @@ public interface ReviewJpaRepository extends JpaRepository<ReviewEntity, Long> {
 
     @EntityGraph(attributePaths = "user")
     Page<ReviewEntity> findByTour_Id(Long tourId, Pageable pageable);
+
+    boolean existsByTour_IdAndUser_Id(Long tourId, Long userId);
 }

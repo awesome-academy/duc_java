@@ -252,4 +252,26 @@ class BookingPersistenceAdapterTest {
 
         assertThat(adapter.cancelIfCancellable(1L)).isFalse();
     }
+
+    @Test
+    void existsByUserIdAndTourIdAndStatusIn_convertsEnumsToNamesBeforeQuerying() {
+        adapter = newAdapter();
+        when(bookingJpaRepository.existsByUser_IdAndTour_IdAndStatusIn(5L, 2L, List.of("CONFIRMED", "COMPLETED")))
+                .thenReturn(true);
+
+        boolean result = adapter.existsByUserIdAndTourIdAndStatusIn(5L, 2L, List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED));
+
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void existsByUserIdAndTourIdAndStatusIn_noMatch_returnsFalse() {
+        adapter = newAdapter();
+        when(bookingJpaRepository.existsByUser_IdAndTour_IdAndStatusIn(5L, 2L, List.of("CONFIRMED", "COMPLETED")))
+                .thenReturn(false);
+
+        boolean result = adapter.existsByUserIdAndTourIdAndStatusIn(5L, 2L, List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED));
+
+        assertThat(result).isFalse();
+    }
 }

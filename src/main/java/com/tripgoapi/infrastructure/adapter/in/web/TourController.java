@@ -3,9 +3,7 @@ package com.tripgoapi.infrastructure.adapter.in.web;
 import com.tripgoapi.application.port.in.GetToursUseCase;
 import com.tripgoapi.application.port.in.GetTourAvailabilityUseCase;
 import com.tripgoapi.application.port.in.GetTourDetailUseCase;
-import com.tripgoapi.application.port.in.GetTourReviewsUseCase;
 import com.tripgoapi.application.port.in.PageResult;
-import com.tripgoapi.application.port.in.TourReviewsResult;
 import com.tripgoapi.application.port.in.TourSearchQuery;
 import com.tripgoapi.application.port.in.TourSortOption;
 import com.tripgoapi.domain.model.Tour;
@@ -14,8 +12,6 @@ import com.tripgoapi.infrastructure.adapter.in.web.dto.ErrorResponse;
 import com.tripgoapi.infrastructure.adapter.in.web.dto.TourAvailabilityResponse;
 import com.tripgoapi.infrastructure.adapter.in.web.dto.TourCardResponse;
 import com.tripgoapi.infrastructure.adapter.in.web.dto.TourDetailResponse;
-import com.tripgoapi.infrastructure.adapter.in.web.dto.TourReviewsResponse;
-import com.tripgoapi.infrastructure.mapper.ReviewWebMapper;
 import com.tripgoapi.infrastructure.mapper.TourAvailabilityWebMapper;
 import com.tripgoapi.infrastructure.mapper.TourDetailWebMapper;
 import com.tripgoapi.infrastructure.mapper.TourWebMapper;
@@ -46,7 +42,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/tours")
 @RequiredArgsConstructor
-@Tag(name = "Tours", description = "Tìm kiếm, chi tiết, lịch khởi hành và đánh giá tour")
+@Tag(name = "Tours", description = "Tìm kiếm, chi tiết và lịch khởi hành tour")
 public class TourController {
 
     private static final int MAX_PAGE_SIZE = 50;
@@ -54,11 +50,9 @@ public class TourController {
     private final GetToursUseCase getToursUseCase;
     private final GetTourDetailUseCase getTourDetailUseCase;
     private final GetTourAvailabilityUseCase getTourAvailabilityUseCase;
-    private final GetTourReviewsUseCase getTourReviewsUseCase;
     private final TourWebMapper tourWebMapper;
     private final TourDetailWebMapper tourDetailWebMapper;
     private final TourAvailabilityWebMapper tourAvailabilityWebMapper;
-    private final ReviewWebMapper reviewWebMapper;
 
     @Operation(
             summary = "Tìm kiếm / lọc / sắp xếp / phân trang tour",
@@ -137,34 +131,6 @@ public class TourController {
     ) {
         YearMonth targetMonth = (month == null || month.isBlank()) ? YearMonth.now() : YearMonth.parse(month);
         return ApiResult.of(tourAvailabilityWebMapper.toResponseList(getTourAvailabilityUseCase.getAvailability(id, targetMonth)));
-    }
-
-    @Operation(
-            summary = "Đánh giá của tour",
-            description = "Trả danh sách đánh giá đã phân trang kèm điểm đánh giá trung bình của tour."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Thành công"),
-            @ApiResponse(responseCode = "404", description = "Không tìm thấy tour",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    })
-    @GetMapping("/{id}/reviews")
-    public TourReviewsResponse getReviews(
-            @Parameter(description = "ID tour") @PathVariable @Positive(message = "id phải > 0") Long id,
-            @Parameter(description = "Số trang, bắt đầu từ 1") @RequestParam(defaultValue = "1")
-            @Min(value = 1, message = "page phải >= 1") int page,
-            @Parameter(description = "Số đánh giá mỗi trang, tối đa 50") @RequestParam(defaultValue = "10")
-            @Min(value = 1, message = "size phải >= 1") @Max(value = MAX_PAGE_SIZE, message = "size phải <= 50") int size
-    ) {
-        TourReviewsResult result = getTourReviewsUseCase.getReviews(id, page, size);
-
-        return new TourReviewsResponse(
-                reviewWebMapper.toResponseList(result.reviews().data()),
-                result.reviews().total(),
-                result.reviews().page(),
-                result.reviews().size(),
-                result.averageRating()
-        );
     }
 
     private TourSortOption parseSort(String sort) {

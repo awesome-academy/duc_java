@@ -48,6 +48,11 @@ public class TourDetailPersistenceAdapter implements TourDetailRepositoryInterfa
         return tourJpaRepository.findByIdAndStatus(id, ACTIVE).map(TourEntity::getRatingAvg);
     }
 
+    @Override
+    public void recalculateRatingStats(Long tourId) {
+        tourJpaRepository.recalculateRatingStats(tourId);
+    }
+
     private TourDetail toDomain(TourEntity entity) {
         List<TourImage> images = tourImageJpaRepository.findByTour_IdOrderByDisplayOrderAsc(entity.getId()).stream()
                 .map(i -> new TourImage(i.getImageUrl(), i.isThumbnail(), i.getDisplayOrder()))

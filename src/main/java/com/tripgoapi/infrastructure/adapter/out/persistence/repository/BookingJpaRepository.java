@@ -27,4 +27,6 @@ public interface BookingJpaRepository extends JpaRepository<BookingEntity, Long>
     @Query("UPDATE BookingEntity b SET b.status = 'CANCELLED' "
             + "WHERE b.id = :id AND b.status IN ('PENDING', 'CONFIRMED')")
     int cancelIfCancellable(@Param("id") Long id);
+
+    boolean existsByUser_IdAndTour_IdAndStatusIn(Long userId, Long tourId, List<String> statuses);
 }

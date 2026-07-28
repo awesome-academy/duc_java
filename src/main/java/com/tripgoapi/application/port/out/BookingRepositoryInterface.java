@@ -43,4 +43,10 @@ public interface BookingRepositoryInterface {
      * @return true if the transition happened (booking existed and was in a cancellable state)
      */
     boolean cancelIfCancellable(Long id);
+
+    /**
+     * Gates review creation to users who actually booked the tour: only a CONFIRMED or COMPLETED
+     * booking should count, so a cancelled or still-pending booking can't be used to post a review.
+     */
+    boolean existsByUserIdAndTourIdAndStatusIn(Long userId, Long tourId, List<BookingStatus> statuses);
 }

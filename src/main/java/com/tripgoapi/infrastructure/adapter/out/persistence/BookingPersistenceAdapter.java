@@ -92,6 +92,12 @@ public class BookingPersistenceAdapter implements BookingRepositoryInterface {
         return bookingJpaRepository.cancelIfCancellable(id) > 0;
     }
 
+    @Override
+    public boolean existsByUserIdAndTourIdAndStatusIn(Long userId, Long tourId, List<BookingStatus> statuses) {
+        List<String> statusNames = statuses.stream().map(Enum::name).toList();
+        return bookingJpaRepository.existsByUser_IdAndTour_IdAndStatusIn(userId, tourId, statusNames);
+    }
+
     private String generateBookingCode(Long id, OffsetDateTime createdAt) {
         return "TG-%d-%06d".formatted(createdAt.getYear(), id);
     }
