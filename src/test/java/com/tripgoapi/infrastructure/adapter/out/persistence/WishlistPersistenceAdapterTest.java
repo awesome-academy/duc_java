@@ -12,7 +12,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -23,7 +22,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -40,28 +38,16 @@ class WishlistPersistenceAdapterTest {
     }
 
     @Test
-    void add_savesEntityBuiltFromGivenUserIdAndTourId() {
+    void add_delegatesToRepositoryUpsertQuery_withGivenUserIdAndTourId() {
+        // Idempotency ("thêm trùng không tạo bản ghi lặp") is enforced by the database's
+        // ON CONFLICT DO NOTHING inside insertIgnoreDuplicate, not by any Java-level try/catch —
+        // see WishlistJpaRepository. This only asserts the adapter delegates with the right ids;
+        // the actual duplicate-is-a-no-op behavior needs a real Postgres to verify.
         WishlistPersistenceAdapter adapter = newAdapter();
 
         adapter.add(5L, 2L);
 
-        ArgumentCaptor<WishlistEntity> captor = ArgumentCaptor.forClass(WishlistEntity.class);
-        verify(wishlistJpaRepository).saveAndFlush(captor.capture());
-        WishlistEntity saved = captor.getValue();
-        assertThat(saved.getUser().getId()).isEqualTo(5L);
-        assertThat(saved.getTour().getId()).isEqualTo(2L);
-    }
-
-    @Test
-    void add_duplicateEntry_swallowsConstraintViolation_insteadOfPropagating() {
-        // Covers "thêm trùng không tạo bản ghi lặp": the (user_id, tour_id) unique constraint is
-        // the actual source of truth here — this asserts the adapter treats that violation as a
-        // no-op, not an error the caller has to handle.
-        WishlistPersistenceAdapter adapter = newAdapter();
-        when(wishlistJpaRepository.saveAndFlush(any(WishlistEntity.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"));
-
-        assertThatCode(() -> adapter.add(5L, 2L)).doesNotThrowAnyException();
+        verify(wishlistJpaRepository).insertIgnoreDuplicate(5L, 2L);
     }
 
     @Test

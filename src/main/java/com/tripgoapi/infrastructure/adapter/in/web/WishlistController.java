@@ -35,7 +35,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -57,7 +56,7 @@ public class WishlistController {
             description = "userId lấy từ JWT, không nhận từ client. Thêm trùng một tour đã có sẵn trong wishlist không tạo bản ghi lặp."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Đã thêm (hoặc đã có sẵn) trong wishlist"),
+            @ApiResponse(responseCode = "204", description = "Đã thêm (hoặc đã có sẵn) trong wishlist"),
             @ApiResponse(responseCode = "422", description = "Dữ liệu không hợp lệ",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy tour",
@@ -71,7 +70,7 @@ public class WishlistController {
             @AuthenticationPrincipal AuthenticatedPrincipal principal
     ) {
         addToWishlistUseCase.addToWishlist(principal.userId(), request.tourId());
-        return ResponseEntity.created(URI.create("/wishlist/" + request.tourId())).build();
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(

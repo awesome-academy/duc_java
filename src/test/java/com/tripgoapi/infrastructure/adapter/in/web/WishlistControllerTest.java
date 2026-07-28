@@ -38,7 +38,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -90,12 +89,11 @@ class WishlistControllerTest {
     }
 
     @Test
-    void addToWishlist_success_returns201_withLocationHeader_andUsesPrincipalUserId() throws Exception {
+    void addToWishlist_success_returns204_andUsesPrincipalUserId() throws Exception {
         mockMvc.perform(post("/wishlist")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"tourId\": 2}"))
-                .andExpect(status().isCreated())
-                .andExpect(header().string("Location", "/wishlist/2"));
+                .andExpect(status().isNoContent());
 
         verify(addToWishlistUseCase).addToWishlist(USER_ID, 2L);
     }

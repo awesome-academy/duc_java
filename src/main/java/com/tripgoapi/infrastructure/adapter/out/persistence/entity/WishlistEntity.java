@@ -38,6 +38,9 @@ public class WishlistEntity {
     @JoinColumn(name = "tour_id", nullable = false)
     private TourEntity tour;
 
-    @Column(name = "created_at", nullable = false)
+    // Row is inserted via a native upsert query (see WishlistJpaRepository#insertIgnoreDuplicate),
+    // not this entity, so Hibernate never writes this column — the DB's DEFAULT now() is the only
+    // source of truth, avoiding clock skew between app instances for the created_at DESC sort.
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 }
