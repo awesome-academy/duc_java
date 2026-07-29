@@ -28,17 +28,48 @@ public interface TourJpaRepository extends JpaRepository<TourEntity, Long>, JpaS
 
     boolean existsByIdAndStatus(Long id, String status);
 
+
+    // --- Admin portal ---
+
     /**
-     * Recomputes both derived columns straight from the reviews table in a single statement,
-     * rather than incrementing counters in application code. This is immune to the classic
-     * increment-based lost-update problem (two concurrent "current count + 1" reads racing each
-     * other) — but it is <b>not</b> immune to drift from two concurrent review inserts for the
-     * <em>same</em> tour under READ COMMITTED: when this UPDATE blocks on another transaction's
-     * row lock and then unblocks via EvalPlanQual, the {@code SET} subqueries still run against
-     * the snapshot the blocked statement originally took, so they can miss a review the other
-     * transaction just committed. Callers must serialize concurrent inserts per tour themselves —
-     * see {@link #lockActiveTourForReview} and {@code CreateReviewService}.
+     * Admin tour list: every non-deleted tour, searchable by title or destination name.
+     *
+     * <p>{@code pattern} is always bound to a non-null, already-lowercased LIKE pattern ("%" when
+     * the search box is empty) rather than using an {@code :keyword IS NULL} guard. Postgres cannot
+     * infer a type for a null String parameter, so the guarded form makes the driver bind it as
+     * bytea and the query dies on {@code lower(bytea) does not exist}.
+     *
+     * <p>The join on destination is LEFT, and its name coalesced to "", so a tour with no
+     * destination still shows up in the unfiltered list and can still match on its title.
      */
+    @EntityGraph(attributePaths = {"destination", "category"})
+    @Query("""
+            SELECT t FROM TourEntity t LEFT JOIN t.destination d
+            WHERE t.status <> 'DELETED'
+              AND (LOWER(t.title) LIKE :pattern OR LOWER(COALESCE(d.name, '')) LIKE :pattern)
+            """)
+    Page<TourEntity> searchForAdmin(@Param("pattern") String pattern, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"destination", "category"})
+    Optional<TourEntity> findByIdAndStatusNot(Long id, String status);
+
+    // Slug uniqueness is enforced across every row, DELETED ones included: the unique index does
+    // not know about soft deletes, so reusing a deleted tour's slug would fail at insert time.
+    boolean existsBySlug(String slug);
+
+    boolean existsBySlugAndIdNot(String slug, Long id);
+
+    long countByDestination_Id(Long destinationId);
+
+    long countByStatus(String status);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE TourEntity t SET t.status = 'DELETED' WHERE t.id = :id AND t.status <> 'DELETED'")
+    int softDelete(@Param("id") Long id);
+
+    // Recomputes both derived columns straight from the reviews table in a single statement,
+    // rather than incrementing counters in application code — immune to drift regardless of how
+    // many reviews already exist or how many inserts race concurrently.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE tours

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{admin/layout :: layout('Quản lý Đơn đặt', ~{:: #page})}">
+<body>
+<div id="page">
+
+    <div class="tabs">
+        <a class="tab" th:classappend="${statusFilter == null} ? ' is-active'"
+           th:href="@{/admin/bookings}">Tất cả</a>
+        <a class="tab" th:classappend="${statusFilter?.name() == 'PENDING'} ? ' is-active'"
+           th:href="@{/admin/bookings(status='PENDING')}">Chờ xác nhận</a>
+        <a class="tab" th:classappend="${statusFilter?.name() == 'CONFIRMED'} ? ' is-active'"
+           th:href="@{/admin/bookings(status='CONFIRMED')}">Đã xác nhận</a>
+        <a class="tab" th:classappend="${statusFilter?.name() == 'CANCELLED'} ? ' is-active'"
+           th:href="@{/admin/bookings(status='CANCELLED')}">Đã hủy</a>
+        <a class="tab" th:classappend="${statusFilter?.name() == 'COMPLETED'} ? ' is-active'"
+           th:href="@{/admin/bookings(status='COMPLETED')}">Hoàn thành</a>
+    </div>
+
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Mã đơn</th>
+            <th>Khách</th>
+            <th>Tour</th>
+            <th>Ngày đi</th>
+            <th>Số khách</th>
+            <th class="ta-right">Tổng tiền</th>
+            <th>Trạng thái</th>
+            <th class="ta-right">Thao tác</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="booking : ${bookings}">
+            <td class="cell-strong" th:text="${booking.bookingCode}">TG-2026-000121</td>
+            <td>
+                <span th:text="${booking.contactName} ?: '—'">Nguyễn An</span>
+                <small class="cell-sub" th:text="${booking.contactPhone}">0900000000</small>
+            </td>
+            <td th:text="${booking.tourTitle}">Đà Nẵng 3N2Đ</td>
+            <td th:text="${#temporals.format(booking.departureDate, 'dd/MM/yyyy')}">05/07/2026</td>
+            <td th:text="${booking.adults} + ' NL' + (${booking.children} > 0 ? ' + ' + ${booking.children} + ' TE' : '')">
+                2 NL
+            </td>
+            <td class="ta-right cell-money"
+                th:text="${#numbers.formatInteger(booking.totalPrice, 1, 'POINT')} + 'đ'">11.225.000đ</td>
+            <td>
+                <span class="badge" th:classappend="' badge--' + ${#strings.toLowerCase(booking.status)}"
+                      th:text="${booking.status}">PENDING</span>
+            </td>
+            <td class="ta-right">
+                <div class="row-actions">
+                    <form th:action="@{/admin/bookings/{id}/status(id=${booking.id})}" method="post"
+                          th:if="${booking.status.name() == 'PENDING'}">
+                        <input type="hidden" name="status" value="CONFIRMED">
+                        <input type="hidden" name="returnStatus" th:value="${statusFilter}">
+                        <input type="hidden" name="page" th:value="${pageInfo.page}">
+                        <button class="btn btn--sm btn--primary" type="submit">Xác nhận</button>
+                    </form>
+
+                    <form th:action="@{/admin/bookings/{id}/status(id=${booking.id})}" method="post"
+                          th:if="${booking.status.name() == 'PENDING' or booking.status.name() == 'CONFIRMED'}"
+                          th:data-confirm="|Hủy đơn ${booking.bookingCode}? Số chỗ sẽ được trả lại cho ngày khởi hành.|">
+                        <input type="hidden" name="status" value="CANCELLED">
+                        <input type="hidden" name="returnStatus" th:value="${statusFilter}">
+                        <input type="hidden" name="page" th:value="${pageInfo.page}">
+                        <button class="btn btn--sm btn--danger" type="submit">Hủy</button>
+                    </form>
+
+                    <span class="cell-sub"
+                          th:if="${booking.status.name() == 'CANCELLED' or booking.status.name() == 'COMPLETED'}">
+                        Không thể đổi
+                    </span>
+                </div>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(bookings)}">
+            <td colspan="8" class="empty">Không có đơn đặt nào ở trạng thái này.</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <nav class="pagination" th:if="${pageInfo.totalPages > 1}">
+        <a th:each="number : ${#numbers.sequence(1, pageInfo.totalPages)}"
+           class="pagination-item"
+           th:classappend="${number == pageInfo.page} ? ' is-active'"
+           th:href="@{/admin/bookings(status=${statusFilter}, page=${number})}"
+           th:text="${number}">1</a>
+    </nav>
+
+</div>
+</body>
+</html>

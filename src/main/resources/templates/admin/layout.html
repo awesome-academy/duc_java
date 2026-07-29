@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!--/*
+  Shared shell for every admin page. Pages call it as:
+      th:replace="~{admin/layout :: layout('Quản lý Tour', ~{:: #page})}"
+  passing their own title and a fragment holding the page body.
+*/-->
+<html lang="vi" xmlns:th="http://www.thymeleaf.org" th:fragment="layout(pageTitle, content)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${pageTitle} + ' · TripGo Admin'">TripGo Admin</title>
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+</head>
+<body>
+
+<div class="layout">
+
+    <aside class="sidebar">
+        <div class="brand">TripGo Admin</div>
+        <nav class="nav">
+            <a th:href="@{/admin}" class="nav-item"
+               th:classappend="${activeMenu == 'dashboard'} ? ' is-active'">Dashboard</a>
+            <a th:href="@{/admin/tours}" class="nav-item"
+               th:classappend="${activeMenu == 'tours'} ? ' is-active'">Tour</a>
+            <a th:href="@{/admin/bookings}" class="nav-item"
+               th:classappend="${activeMenu == 'bookings'} ? ' is-active'">Đơn đặt</a>
+            <a th:href="@{/admin/destinations}" class="nav-item"
+               th:classappend="${activeMenu == 'destinations'} ? ' is-active'">Điểm đến</a>
+
+            <!--/* POST, not a link: Spring Security's logout is POST-only so a stray GET can't sign the admin out. */-->
+            <form th:action="@{/admin/logout}" method="post" class="nav-logout">
+                <button type="submit" class="nav-item nav-item--button">Đăng xuất</button>
+            </form>
+        </nav>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <h1 class="topbar-title" th:text="${pageTitle}">Trang quản trị</h1>
+            <div class="topbar-user">
+                <span th:text="${adminName}">Admin</span>
+                <span class="avatar"></span>
+            </div>
+        </header>
+
+        <main class="content">
+            <div class="alert alert--success" th:if="${successMessage}" th:text="${successMessage}"></div>
+            <div class="alert alert--danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+            <th:block th:replace="${content}"></th:block>
+        </main>
+    </div>
+
+</div>
+
+<script th:src="@{/js/admin.js}"></script>
+</body>
+</html>

@@ -6,6 +6,8 @@ import com.tripgoapi.infrastructure.adapter.out.security.JwtAuthenticationFilter
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -34,11 +36,27 @@ public class SecurityConfig {
             "/v3/api-docs/**"
     };
 
+    /**
+     * The admin portal's CSS/JS and its uploaded images. This chain ends in
+     * {@code anyRequest().authenticated()}, so without these the login page would render unstyled
+     * — the browser fetches assets without an Authorization header.
+     */
+    private static final String[] STATIC_RESOURCES = {
+            "/css/**",
+            "/js/**",
+            "/images/**",
+            "/uploads/**",
+            "/favicon.ico",
+            "/error"
+    };
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
+    // Runs after AdminSecurityConfig's chain, which claims /admin/** first.
     @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE + 10)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -47,6 +65,7 @@ public class SecurityConfig {
                         // GET-only: POST /tours/{id}/reviews needs the authenticated user's id,
                         // so it must fall through to .anyRequest().authenticated() below.
                         .requestMatchers(HttpMethod.GET, "/tours/**").permitAll()
+                        .requestMatchers(STATIC_RESOURCES).permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(handling -> handling
