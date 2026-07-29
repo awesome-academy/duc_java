@@ -3,6 +3,7 @@ package com.tripgoapi.application.port.out;
 import com.tripgoapi.domain.model.Booking;
 import com.tripgoapi.domain.model.BookingStatus;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,8 +46,15 @@ public interface BookingRepositoryInterface {
     boolean cancelIfCancellable(Long id);
 
     /**
-     * Gates review creation to users who actually booked the tour: only a CONFIRMED or COMPLETED
-     * booking should count, so a cancelled or still-pending booking can't be used to post a review.
+     * Gates review creation to users who both booked the tour and have actually taken the trip: a
+     * booking in one of {@code statuses} whose departure date is on or before
+     * {@code onOrBeforeDate}. A CONFIRMED booking whose departure hasn't happened yet must not
+     * qualify — reviews cannot be edited (UNIQUE(tour_id, user_id), no update endpoint), so
+     * letting it qualify would let a user "use up" their one review before ever taking the tour.
+     *
+     * @param onOrBeforeDate typically "today"; passed in by the caller rather than resolved here
+     *                       so the "has the trip happened" rule stays visible and testable in the
+     *                       service that owns it
      */
-    boolean existsByUserIdAndTourIdAndStatusIn(Long userId, Long tourId, List<BookingStatus> statuses);
+    boolean existsReviewEligibleBooking(Long userId, Long tourId, List<BookingStatus> statuses, LocalDate onOrBeforeDate);
 }

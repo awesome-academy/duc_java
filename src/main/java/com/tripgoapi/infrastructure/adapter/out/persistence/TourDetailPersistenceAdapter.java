@@ -44,6 +44,11 @@ public class TourDetailPersistenceAdapter implements TourDetailRepositoryInterfa
     }
 
     @Override
+    public boolean lockActiveTourForReview(Long id) {
+        return tourJpaRepository.lockActiveTourForReview(id).isPresent();
+    }
+
+    @Override
     public Optional<BigDecimal> findRatingAvg(Long id) {
         return tourJpaRepository.findByIdAndStatus(id, ACTIVE).map(TourEntity::getRatingAvg);
     }

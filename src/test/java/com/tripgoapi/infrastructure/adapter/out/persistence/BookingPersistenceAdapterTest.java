@@ -254,23 +254,32 @@ class BookingPersistenceAdapterTest {
     }
 
     @Test
-    void existsByUserIdAndTourIdAndStatusIn_convertsEnumsToNamesBeforeQuerying() {
+    void existsReviewEligibleBooking_convertsEnumsToNamesBeforeQuerying() {
         adapter = newAdapter();
-        when(bookingJpaRepository.existsByUser_IdAndTour_IdAndStatusIn(5L, 2L, List.of("CONFIRMED", "COMPLETED")))
+        LocalDate today = LocalDate.of(2026, 8, 20);
+        when(bookingJpaRepository.existsByUser_IdAndTour_IdAndStatusInAndDeparture_DepartureDateLessThanEqual(
+                5L, 2L, List.of("CONFIRMED", "COMPLETED"), today))
                 .thenReturn(true);
 
-        boolean result = adapter.existsByUserIdAndTourIdAndStatusIn(5L, 2L, List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED));
+        boolean result = adapter.existsReviewEligibleBooking(
+                5L, 2L, List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED), today);
 
         assertThat(result).isTrue();
     }
 
     @Test
-    void existsByUserIdAndTourIdAndStatusIn_noMatch_returnsFalse() {
+    void existsReviewEligibleBooking_noMatch_returnsFalse() {
+        // Covers both "no booking at all" and "booking exists but departure date hasn't passed
+        // onOrBeforeDate yet" — the repository method makes no distinction between them, and
+        // neither should the adapter.
         adapter = newAdapter();
-        when(bookingJpaRepository.existsByUser_IdAndTour_IdAndStatusIn(5L, 2L, List.of("CONFIRMED", "COMPLETED")))
+        LocalDate today = LocalDate.of(2026, 8, 20);
+        when(bookingJpaRepository.existsByUser_IdAndTour_IdAndStatusInAndDeparture_DepartureDateLessThanEqual(
+                5L, 2L, List.of("CONFIRMED", "COMPLETED"), today))
                 .thenReturn(false);
 
-        boolean result = adapter.existsByUserIdAndTourIdAndStatusIn(5L, 2L, List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED));
+        boolean result = adapter.existsReviewEligibleBooking(
+                5L, 2L, List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED), today);
 
         assertThat(result).isFalse();
     }

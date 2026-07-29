@@ -141,17 +141,31 @@ class TourReviewControllerTest {
     }
 
     @Test
-    void createReview_nonPositiveTourId_stillGoesToUseCase_andSurfacesAsTourNotFound() throws Exception {
-        // tourId has no @Positive here (see TourReviewController.createReview): mixing it with
-        // @Valid on the body would demote rating validation errors from 422 to 400. A
-        // non-positive id simply matches no tour, so it 404s via the service instead of failing
-        // fast at 400.
-        when(createReviewUseCase.createReview(any())).thenThrow(new TourNotFoundException(0L));
-
+    void createReview_nonPositiveTourId_isRejectedWith400_beforeReachingUseCase() throws Exception {
+        // tourId now carries @Positive, same as getReviews above. GlobalExceptionHandler is what
+        // keeps this at 400 (a plain path-variable violation) — it must not depend on which other
+        // annotations happen to be present on this method.
         mockMvc.perform(post("/tours/0/reviews")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"rating\": 4}"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(createReviewUseCase);
+    }
+
+    @Test
+    void createReview_pathVariableViolationCombinedWithInvalidBody_stillReturns422() throws Exception {
+        // Regression guard for the exact fragility this fix closes: once tourId carries a
+        // constraint (@Positive), Spring funnels it and the @Valid body violation through the
+        // same HandlerMethodValidationException. The rating violation must still win 422 — the
+        // response code for a request like this cannot depend on which parameter also happened
+        // to be invalid.
+        mockMvc.perform(post("/tours/0/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\": 6}"))
+                .andExpect(status().isUnprocessableEntity());
+
+        verifyNoInteractions(createReviewUseCase);
     }
 
     @Test

@@ -80,17 +80,21 @@ public class TourReviewController {
         );
     }
 
-    // No @Positive on tourId (unlike getReviews above): combined with @Valid on the body below,
-    // Spring routes the whole method through unified method validation and rating violations
-    // would surface as 400 instead of 422. A non-positive/non-existent tourId still 404s via
-    // TourNotFoundException from the service, just one hop later.
+    // @Positive on tourId, same as getReviews above: once the annotation is present, Spring
+    // funnels every constrained parameter of this method — including @Valid violations cascaded
+    // from the request body — through the same HandlerMethodValidationException. Status 400 vs
+    // 422 for that shared exception is decided in GlobalExceptionHandler by the violation's
+    // source (path variable vs request body), not by which annotations happen to be on this
+    // method — so tourId can carry @Positive without demoting rating's validation to 400.
     @Operation(
             summary = "Đánh giá tour",
-            description = "Chỉ user đã đăng nhập và đã đặt tour này (booking CONFIRMED/COMPLETED) mới được đánh giá; "
+            description = "Chỉ user đã đăng nhập, đã đặt tour này (booking CONFIRMED/COMPLETED) và tour đã khởi hành mới được đánh giá; "
                     + "mỗi user chỉ đánh giá một tour một lần. Sau khi tạo, rating trung bình và số lượt đánh giá của tour được cập nhật ngay."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Đánh giá thành công"),
+            @ApiResponse(responseCode = "400", description = "tourId không hợp lệ (phải > 0)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "422", description = "Dữ liệu không hợp lệ (rating ngoài khoảng 1-5)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy tour",
@@ -105,7 +109,7 @@ public class TourReviewController {
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ApiResult<ReviewResponse>> createReview(
-            @Parameter(description = "ID tour") @PathVariable Long tourId,
+            @Parameter(description = "ID tour") @PathVariable @Positive(message = "tourId phải > 0") Long tourId,
             @Valid @RequestBody CreateReviewRequest request,
             @AuthenticationPrincipal AuthenticatedPrincipal principal
     ) {

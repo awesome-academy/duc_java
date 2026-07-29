@@ -20,6 +20,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -103,9 +104,21 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ResponseEntity<ErrorResponse> handleHandlerMethodValidation(HandlerMethodValidationException ex, HttpServletRequest request) {
+        // Spring funnels every constrained parameter of a method through this single exception
+        // once ANY of them carries a direct constraint (e.g. @Positive on a @PathVariable) —
+        // including violations cascaded from @Valid on a @RequestBody. Left unfiltered, adding
+        // such an annotation anywhere on a method would silently demote its @RequestBody
+        // violations from 422 to 400. Split by source instead: a violation against the request
+        // body is a business-rule failure (422); everything else (path/query/header params) is a
+        // malformed request (400). A body violation wins if both kinds are present at once.
+        boolean hasBodyViolation = ex.getParameterValidationResults().stream()
+                .anyMatch(result -> result.getMethodParameter().hasParameterAnnotation(RequestBody.class));
+
         String message = BindErrorUtils.resolveAndJoin(ex.getAllErrors());
         log.warn("Validation failed at {}: {}", request.getRequestURI(), message);
-        return build(HttpStatus.BAD_REQUEST, message, request);
+        return hasBodyViolation
+                ? build(HttpStatus.UNPROCESSABLE_CONTENT, message, request)
+                : build(HttpStatus.BAD_REQUEST, message, request);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

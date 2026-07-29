@@ -11,9 +11,11 @@ import com.tripgoapi.domain.model.BookingStatus;
 import com.tripgoapi.domain.model.Review;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -23,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -52,7 +55,7 @@ class CreateReviewServiceTest {
     @Test
     void tourNotFound_throwsTourNotFoundException_neverTouchesBookingOrReview() {
         CreateReviewService service = newService();
-        when(tourDetailRepository.existsActiveTour(TOUR_ID)).thenReturn(false);
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> service.createReview(newCommand()))
                 .isInstanceOf(TourNotFoundException.class);
@@ -63,10 +66,13 @@ class CreateReviewServiceTest {
 
     @Test
     void noConfirmedOrCompletedBooking_throwsReviewNotAllowedException_neverSaves() {
+        // Also covers "booking exists but departure date hasn't passed yet" — the port makes no
+        // distinction between the two, and CreateReviewService must reject both the same way.
         CreateReviewService service = newService();
-        when(tourDetailRepository.existsActiveTour(TOUR_ID)).thenReturn(true);
-        when(bookingRepository.existsByUserIdAndTourIdAndStatusIn(USER_ID, TOUR_ID,
-                List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED))).thenReturn(false);
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(true);
+        when(bookingRepository.existsReviewEligibleBooking(eq(USER_ID), eq(TOUR_ID),
+                eq(List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED)), any(LocalDate.class)))
+                .thenReturn(false);
 
         assertThatThrownBy(() -> service.createReview(newCommand()))
                 .isInstanceOf(ReviewNotAllowedException.class);
@@ -78,9 +84,9 @@ class CreateReviewServiceTest {
     @Test
     void alreadyReviewed_throwsReviewAlreadyExistsException_neverSavesOrRecalculates() {
         CreateReviewService service = newService();
-        when(tourDetailRepository.existsActiveTour(TOUR_ID)).thenReturn(true);
-        when(bookingRepository.existsByUserIdAndTourIdAndStatusIn(anyLong(), anyLong(), any())).thenReturn(true);
-        when(reviewRepository.existsByTourIdAndUserId(TOUR_ID, USER_ID)).thenReturn(true);
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(true);
+        when(bookingRepository.existsReviewEligibleBooking(anyLong(), anyLong(), any(), any())).thenReturn(true);
+        when(reviewRepository.existsByUserIdAndTourId(USER_ID, TOUR_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> service.createReview(newCommand()))
                 .isInstanceOf(ReviewAlreadyExistsException.class);
@@ -92,16 +98,35 @@ class CreateReviewServiceTest {
     @Test
     void validRequest_savesReview_thenRecalculatesTourRatingStats() {
         CreateReviewService service = newService();
-        when(tourDetailRepository.existsActiveTour(TOUR_ID)).thenReturn(true);
-        when(bookingRepository.existsByUserIdAndTourIdAndStatusIn(anyLong(), anyLong(), any())).thenReturn(true);
-        when(reviewRepository.existsByTourIdAndUserId(TOUR_ID, USER_ID)).thenReturn(false);
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(true);
+        when(bookingRepository.existsReviewEligibleBooking(anyLong(), anyLong(), any(), any())).thenReturn(true);
+        when(reviewRepository.existsByUserIdAndTourId(USER_ID, TOUR_ID)).thenReturn(false);
         Review saved = new Review(10L, null, 4, "Tuyệt vời", OffsetDateTime.now());
-        when(reviewRepository.save(TOUR_ID, USER_ID, 4, "Tuyệt vời")).thenReturn(saved);
+        when(reviewRepository.save(USER_ID, TOUR_ID, 4, "Tuyệt vời")).thenReturn(saved);
 
         Review result = service.createReview(newCommand());
 
         assertThat(result).isSameAs(saved);
-        verify(reviewRepository).save(TOUR_ID, USER_ID, 4, "Tuyệt vời");
+        verify(reviewRepository).save(USER_ID, TOUR_ID, 4, "Tuyệt vời");
         verify(tourDetailRepository).recalculateRatingStats(TOUR_ID);
+    }
+
+    @Test
+    void eligibilityCheck_isEvaluatedAsOfToday() {
+        // Locks in the actual behavioral fix, not just the mock signature: the service must
+        // resolve "has the trip happened" itself, as of today, rather than leaving the cutoff
+        // date to whatever the repository happens to default to.
+        CreateReviewService service = newService();
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(true);
+        ArgumentCaptor<LocalDate> dateCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        when(bookingRepository.existsReviewEligibleBooking(eq(USER_ID), eq(TOUR_ID), any(), dateCaptor.capture()))
+                .thenReturn(true);
+        when(reviewRepository.existsByUserIdAndTourId(USER_ID, TOUR_ID)).thenReturn(false);
+        when(reviewRepository.save(anyLong(), anyLong(), anyInt(), anyString()))
+                .thenReturn(new Review(1L, null, 4, "Tuyệt vời", OffsetDateTime.now()));
+
+        service.createReview(newCommand());
+
+        assertThat(dateCaptor.getValue()).isEqualTo(LocalDate.now());
     }
 }

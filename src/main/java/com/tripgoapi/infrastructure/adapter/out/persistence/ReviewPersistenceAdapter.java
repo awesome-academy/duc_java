@@ -6,8 +6,8 @@ import com.tripgoapi.domain.exception.ReviewAlreadyExistsException;
 import com.tripgoapi.domain.model.Review;
 import com.tripgoapi.infrastructure.adapter.out.persistence.entity.ReviewEntity;
 import com.tripgoapi.infrastructure.adapter.out.persistence.entity.TourEntity;
-import com.tripgoapi.infrastructure.adapter.out.persistence.entity.UserEntity;
 import com.tripgoapi.infrastructure.adapter.out.persistence.repository.ReviewJpaRepository;
+import com.tripgoapi.infrastructure.adapter.out.persistence.repository.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -22,6 +22,7 @@ import java.time.OffsetDateTime;
 public class ReviewPersistenceAdapter implements ReviewRepositoryInterface {
 
     private final ReviewJpaRepository reviewJpaRepository;
+    private final UserJpaRepository userJpaRepository;
 
     @Override
     public PageResult<Review> findReviews(Long tourId, int page, int size) {
@@ -37,15 +38,18 @@ public class ReviewPersistenceAdapter implements ReviewRepositoryInterface {
     }
 
     @Override
-    public boolean existsByTourIdAndUserId(Long tourId, Long userId) {
-        return reviewJpaRepository.existsByTour_IdAndUser_Id(tourId, userId);
+    public boolean existsByUserIdAndTourId(Long userId, Long tourId) {
+        return reviewJpaRepository.existsByUser_IdAndTour_Id(userId, tourId);
     }
 
     @Override
-    public Review save(Long tourId, Long userId, int rating, String comment) {
+    public Review save(Long userId, Long tourId, int rating, String comment) {
         ReviewEntity entity = ReviewEntity.builder()
                 .tour(TourEntity.builder().id(tourId).build())
-                .user(UserEntity.builder().id(userId).build())
+                // A managed reference, not a hand-built stub: getFullName() lazy-loads within this
+                // same transaction, so toDomain can be reused below instead of hardcoding
+                // reviewerName to null on the just-created review.
+                .user(userJpaRepository.getReferenceById(userId))
                 .rating(rating)
                 .comment(comment)
                 .createdAt(OffsetDateTime.now())
@@ -53,12 +57,9 @@ public class ReviewPersistenceAdapter implements ReviewRepositoryInterface {
 
         try {
             // saveAndFlush forces the UNIQUE(tour_id, user_id) constraint check here, closing the
-            // existsByTourIdAndUserId-then-save race between two concurrent review submissions
+            // existsByUserIdAndTourId-then-save race between two concurrent review submissions
             // from the same user (see UserPersistenceAdapter.createUser for the same pattern).
-            ReviewEntity saved = reviewJpaRepository.saveAndFlush(entity);
-            // saved.getUser() is a stub entity holding only the id set above, so reviewerName is
-            // left null here rather than silently reading it off the stub.
-            return new Review(saved.getId(), null, saved.getRating(), saved.getComment(), saved.getCreatedAt());
+            return toDomain(reviewJpaRepository.saveAndFlush(entity));
         } catch (DataIntegrityViolationException ex) {
             throw new ReviewAlreadyExistsException(tourId);
         }

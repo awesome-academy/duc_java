@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -93,9 +94,10 @@ public class BookingPersistenceAdapter implements BookingRepositoryInterface {
     }
 
     @Override
-    public boolean existsByUserIdAndTourIdAndStatusIn(Long userId, Long tourId, List<BookingStatus> statuses) {
+    public boolean existsReviewEligibleBooking(Long userId, Long tourId, List<BookingStatus> statuses, LocalDate onOrBeforeDate) {
         List<String> statusNames = statuses.stream().map(Enum::name).toList();
-        return bookingJpaRepository.existsByUser_IdAndTour_IdAndStatusIn(userId, tourId, statusNames);
+        return bookingJpaRepository.existsByUser_IdAndTour_IdAndStatusInAndDeparture_DepartureDateLessThanEqual(
+                userId, tourId, statusNames, onOrBeforeDate);
     }
 
     private String generateBookingCode(Long id, OffsetDateTime createdAt) {
