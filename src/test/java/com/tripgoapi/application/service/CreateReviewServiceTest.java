@@ -1,0 +1,132 @@
+package com.tripgoapi.application.service;
+
+import com.tripgoapi.application.port.in.CreateReviewCommand;
+import com.tripgoapi.application.port.out.BookingRepositoryInterface;
+import com.tripgoapi.application.port.out.ReviewRepositoryInterface;
+import com.tripgoapi.application.port.out.TourDetailRepositoryInterface;
+import com.tripgoapi.domain.exception.ReviewAlreadyExistsException;
+import com.tripgoapi.domain.exception.ReviewNotAllowedException;
+import com.tripgoapi.domain.exception.TourNotFoundException;
+import com.tripgoapi.domain.model.BookingStatus;
+import com.tripgoapi.domain.model.Review;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class CreateReviewServiceTest {
+
+    private static final Long USER_ID = 5L;
+    private static final Long TOUR_ID = 2L;
+
+    @Mock
+    private TourDetailRepositoryInterface tourDetailRepository;
+    @Mock
+    private BookingRepositoryInterface bookingRepository;
+    @Mock
+    private ReviewRepositoryInterface reviewRepository;
+
+    private CreateReviewService newService() {
+        return new CreateReviewService(tourDetailRepository, bookingRepository, reviewRepository);
+    }
+
+    private CreateReviewCommand newCommand() {
+        return new CreateReviewCommand(USER_ID, TOUR_ID, 4, "Tuyệt vời");
+    }
+
+    @Test
+    void tourNotFound_throwsTourNotFoundException_neverTouchesBookingOrReview() {
+        CreateReviewService service = newService();
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createReview(newCommand()))
+                .isInstanceOf(TourNotFoundException.class);
+
+        verifyNoInteractions(bookingRepository);
+        verifyNoInteractions(reviewRepository);
+    }
+
+    @Test
+    void noConfirmedOrCompletedBooking_throwsReviewNotAllowedException_neverSaves() {
+        // Also covers "booking exists but departure date hasn't passed yet" — the port makes no
+        // distinction between the two, and CreateReviewService must reject both the same way.
+        CreateReviewService service = newService();
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(true);
+        when(bookingRepository.existsReviewEligibleBooking(eq(USER_ID), eq(TOUR_ID),
+                eq(List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED)), any(LocalDate.class)))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> service.createReview(newCommand()))
+                .isInstanceOf(ReviewNotAllowedException.class);
+
+        verifyNoInteractions(reviewRepository);
+        verify(tourDetailRepository, never()).recalculateRatingStats(any());
+    }
+
+    @Test
+    void alreadyReviewed_throwsReviewAlreadyExistsException_neverSavesOrRecalculates() {
+        CreateReviewService service = newService();
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(true);
+        when(bookingRepository.existsReviewEligibleBooking(anyLong(), anyLong(), any(), any())).thenReturn(true);
+        when(reviewRepository.existsByUserIdAndTourId(USER_ID, TOUR_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createReview(newCommand()))
+                .isInstanceOf(ReviewAlreadyExistsException.class);
+
+        verify(reviewRepository, never()).save(anyLong(), anyLong(), anyInt(), anyString());
+        verify(tourDetailRepository, never()).recalculateRatingStats(any());
+    }
+
+    @Test
+    void validRequest_savesReview_thenRecalculatesTourRatingStats() {
+        CreateReviewService service = newService();
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(true);
+        when(bookingRepository.existsReviewEligibleBooking(anyLong(), anyLong(), any(), any())).thenReturn(true);
+        when(reviewRepository.existsByUserIdAndTourId(USER_ID, TOUR_ID)).thenReturn(false);
+        Review saved = new Review(10L, null, 4, "Tuyệt vời", OffsetDateTime.now());
+        when(reviewRepository.save(USER_ID, TOUR_ID, 4, "Tuyệt vời")).thenReturn(saved);
+
+        Review result = service.createReview(newCommand());
+
+        assertThat(result).isSameAs(saved);
+        verify(reviewRepository).save(USER_ID, TOUR_ID, 4, "Tuyệt vời");
+        verify(tourDetailRepository).recalculateRatingStats(TOUR_ID);
+    }
+
+    @Test
+    void eligibilityCheck_isEvaluatedAsOfToday() {
+        // Locks in the actual behavioral fix, not just the mock signature: the service must
+        // resolve "has the trip happened" itself, as of today, rather than leaving the cutoff
+        // date to whatever the repository happens to default to.
+        CreateReviewService service = newService();
+        when(tourDetailRepository.lockActiveTourForReview(TOUR_ID)).thenReturn(true);
+        ArgumentCaptor<LocalDate> dateCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        when(bookingRepository.existsReviewEligibleBooking(eq(USER_ID), eq(TOUR_ID), any(), dateCaptor.capture()))
+                .thenReturn(true);
+        when(reviewRepository.existsByUserIdAndTourId(USER_ID, TOUR_ID)).thenReturn(false);
+        when(reviewRepository.save(anyLong(), anyLong(), anyInt(), anyString()))
+                .thenReturn(new Review(1L, null, 4, "Tuyệt vời", OffsetDateTime.now()));
+
+        service.createReview(newCommand());
+
+        assertThat(dateCaptor.getValue()).isEqualTo(LocalDate.now());
+    }
+}

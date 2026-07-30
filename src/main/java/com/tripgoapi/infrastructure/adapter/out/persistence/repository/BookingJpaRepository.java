@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,4 +28,10 @@ public interface BookingJpaRepository extends JpaRepository<BookingEntity, Long>
     @Query("UPDATE BookingEntity b SET b.status = 'CANCELLED' "
             + "WHERE b.id = :id AND b.status IN ('PENDING', 'CONFIRMED')")
     int cancelIfCancellable(@Param("id") Long id);
+
+    // Long derived name intentional: mirrors what used to be existsByUser_IdAndTour_IdAndStatusIn,
+    // extended with the departure-date-passed condition review eligibility needs (see
+    // BookingRepositoryInterface#existsReviewEligibleBooking for why).
+    boolean existsByUser_IdAndTour_IdAndStatusInAndDeparture_DepartureDateLessThanEqual(
+            Long userId, Long tourId, List<String> statuses, LocalDate onOrBeforeDate);
 }
