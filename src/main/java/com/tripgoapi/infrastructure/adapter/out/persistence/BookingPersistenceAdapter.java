@@ -105,25 +105,6 @@ public class BookingPersistenceAdapter implements BookingRepositoryInterface {
     }
 
     private Booking toDomain(BookingEntity entity) {
-        return new Booking(
-                entity.getId(),
-                entity.getBookingCode(),
-                entity.getIdempotencyKey(),
-                entity.getUser().getId(),
-                entity.getTour().getId(),
-                entity.getTour().getTitle(),
-                entity.getTour().getSlug(),
-                entity.getTour().getDurationDays(),
-                entity.getDeparture().getId(),
-                entity.getDeparture().getDepartureDate(),
-                entity.getAdults(),
-                entity.getChildren(),
-                entity.getTotalPrice(),
-                BookingStatus.valueOf(entity.getStatus()),
-                entity.getContactName(),
-                entity.getContactEmail(),
-                entity.getContactPhone(),
-                entity.getCreatedAt()
-        );
+        return BookingEntityMapper.toDomain(entity);
     }
 }

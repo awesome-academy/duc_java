@@ -30,7 +30,9 @@ import org.springframework.web.util.BindErrorUtils;
 import java.time.format.DateTimeParseException;
 import java.util.stream.Collectors;
 
-@RestControllerAdvice
+// Scoped to the REST adapter package: without this it would also swallow exceptions thrown by the
+// Thymeleaf admin controllers and answer them with JSON instead of an HTML error page.
+@RestControllerAdvice(basePackages = "com.tripgoapi.infrastructure.adapter.in.web")
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);

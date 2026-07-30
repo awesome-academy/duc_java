@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{admin/layout :: layout('Dashboard', ~{:: #page})}">
+<body>
+<div id="page">
+
+    <div class="stat-grid">
+        <div class="stat-card">
+            <span class="stat-label">Tour đang hoạt động</span>
+            <span class="stat-value" th:text="${stats.activeTours}">0</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Đơn chờ xác nhận</span>
+            <span class="stat-value stat-value--warning" th:text="${stats.pendingBookings}">0</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Đơn đã xác nhận</span>
+            <span class="stat-value stat-value--success" th:text="${stats.confirmedBookings}">0</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Điểm đến</span>
+            <span class="stat-value" th:text="${stats.destinations}">0</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Khách hàng</span>
+            <span class="stat-value" th:text="${stats.customers}">0</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Doanh thu (đã xác nhận)</span>
+            <span class="stat-value stat-value--money"
+                  th:text="${#numbers.formatInteger(stats.revenue, 1, 'POINT')} + 'đ'">0đ</span>
+        </div>
+    </div>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2 class="panel-title">Đơn đặt gần đây</h2>
+            <a class="btn btn--ghost" th:href="@{/admin/bookings}">Xem tất cả</a>
+        </div>
+
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Mã đơn</th>
+                <th>Khách</th>
+                <th>Tour</th>
+                <th>Ngày đi</th>
+                <th class="ta-right">Tổng tiền</th>
+                <th>Trạng thái</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="booking : ${recentBookings}">
+                <td class="cell-strong" th:text="${booking.bookingCode}">TG-2026-000121</td>
+                <td th:text="${booking.contactName}">Nguyễn An</td>
+                <td th:text="${booking.tourTitle}">Đà Nẵng 3N2Đ</td>
+                <td th:text="${#temporals.format(booking.departureDate, 'dd/MM/yyyy')}">05/07/2026</td>
+                <td class="ta-right cell-money"
+                    th:text="${#numbers.formatInteger(booking.totalPrice, 1, 'POINT')} + 'đ'">0đ</td>
+                <td>
+                    <span class="badge" th:classappend="' badge--' + ${#strings.toLowerCase(booking.status)}"
+                          th:text="${booking.status}">PENDING</span>
+                </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(recentBookings)}">
+                <td colspan="6" class="empty">Chưa có đơn đặt nào.</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+</div>
+</body>
+</html>

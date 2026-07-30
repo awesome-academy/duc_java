@@ -17,4 +17,10 @@ public interface DestinationJpaRepository extends JpaRepository<DestinationEntit
             ORDER BY d.name
             """, nativeQuery = true)
     List<DestinationCardProjection> findAllWithTourCount();
+
+    List<DestinationEntity> findAllByOrderByNameAsc();
+
+    boolean existsBySlug(String slug);
+
+    boolean existsBySlugAndIdNot(String slug, Long id);
 }

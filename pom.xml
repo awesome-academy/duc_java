@@ -131,6 +131,7 @@
         </dependency>
 
         <!-- springSecurity()/formLogin() MockMvc support for SecurityConfigIntegrationTest -->
+        <!-- formLogin()/csrf()/@WithMockUser support for the /admin/** security tests -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>

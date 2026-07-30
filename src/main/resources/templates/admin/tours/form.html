@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{admin/layout :: layout(${editing} ? 'Sửa Tour' : 'Thêm Tour', ~{:: #page})}">
+<body>
+<div id="page">
+
+    <form class="panel form"
+          th:action="${editing} ? @{/admin/tours/{id}(id=${tourForm.id})} : @{/admin/tours}"
+          th:object="${tourForm}" method="post" enctype="multipart/form-data" novalidate>
+
+        <div class="alert alert--danger" th:if="${#fields.hasGlobalErrors()}">
+            <p th:each="error : ${#fields.globalErrors()}" th:text="${error}">Lỗi</p>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="title">Tên tour <span class="req">*</span></label>
+            <input class="field-input" id="title" type="text" th:field="*{title}"
+                   th:errorclass="is-invalid" placeholder="Đà Nẵng - Hội An 3N2Đ">
+            <p class="field-error" th:if="${#fields.hasErrors('title')}" th:errors="*{title}"></p>
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label class="field-label" for="destinationId">Điểm đến <span class="req">*</span></label>
+                <select class="field-input" id="destinationId" th:field="*{destinationId}"
+                        th:errorclass="is-invalid">
+                    <option value="">-- Chọn điểm đến --</option>
+                    <option th:each="destination : ${destinations}"
+                            th:value="${destination.id}" th:text="${destination.name}">Đà Nẵng</option>
+                </select>
+                <p class="field-error" th:if="${#fields.hasErrors('destinationId')}"
+                   th:errors="*{destinationId}"></p>
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="categoryId">Loại hình</label>
+                <select class="field-input" id="categoryId" th:field="*{categoryId}">
+                    <option value="">-- Không chọn --</option>
+                    <option th:each="category : ${categories}"
+                            th:value="${category.id}" th:text="${category.name}">Biển</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="field-row field-row--3">
+            <div class="field">
+                <label class="field-label" for="price">Giá (VND) <span class="req">*</span></label>
+                <input class="field-input" id="price" type="number" step="1000" min="0"
+                       th:field="*{price}" th:errorclass="is-invalid">
+                <p class="field-error" th:if="${#fields.hasErrors('price')}" th:errors="*{price}"></p>
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="discountPrice">Giá khuyến mãi</label>
+                <input class="field-input" id="discountPrice" type="number" step="1000" min="0"
+                       th:field="*{discountPrice}" th:errorclass="is-invalid">
+                <p class="field-error" th:if="${#fields.hasErrors('discountPrice')}"
+                   th:errors="*{discountPrice}"></p>
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="durationDays">Thời lượng (ngày) <span class="req">*</span></label>
+                <input class="field-input" id="durationDays" type="number" min="1" max="365"
+                       th:field="*{durationDays}" th:errorclass="is-invalid">
+                <p class="field-error" th:if="${#fields.hasErrors('durationDays')}"
+                   th:errors="*{durationDays}"></p>
+            </div>
+        </div>
+
+        <div class="field-row field-row--3">
+            <div class="field">
+                <label class="field-label" for="maxGuests">Số khách tối đa</label>
+                <input class="field-input" id="maxGuests" type="number" min="1" max="1000"
+                       th:field="*{maxGuests}" th:errorclass="is-invalid">
+                <p class="field-error" th:if="${#fields.hasErrors('maxGuests')}" th:errors="*{maxGuests}"></p>
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="status">Trạng thái</label>
+                <select class="field-input" id="status" th:field="*{status}">
+                    <option th:each="statusOption : ${statuses}"
+                            th:value="${statusOption}" th:text="${statusOption}">ACTIVE</option>
+                </select>
+            </div>
+
+            <div class="field field--checkbox">
+                <label class="field-label">Tour nổi bật</label>
+                <label class="checkbox">
+                    <input type="checkbox" th:field="*{featured}">
+                    <span>Hiển thị ở mục nổi bật</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="description">Mô tả</label>
+            <textarea class="field-input field-textarea" id="description" rows="4"
+                      th:field="*{description}" th:errorclass="is-invalid"></textarea>
+            <p class="field-error" th:if="${#fields.hasErrors('description')}" th:errors="*{description}"></p>
+        </div>
+
+        <div class="field">
+            <label class="field-label">Lịch trình (theo ngày)</label>
+
+            <div id="itinerary-rows">
+                <div class="itinerary-row" th:each="day, dayStat : *{itinerary}">
+                    <span class="itinerary-day">Ngày <span class="itinerary-day-number"
+                                                           th:text="${dayStat.count}">1</span></span>
+                    <input class="field-input" type="text" placeholder="Tiêu đề ngày"
+                           th:field="*{itinerary[__${dayStat.index}__].title}">
+                    <input class="field-input" type="text" placeholder="Mô tả hoạt động trong ngày"
+                           th:field="*{itinerary[__${dayStat.index}__].description}">
+                    <button class="btn btn--sm btn--danger" type="button" data-remove-itinerary>×</button>
+                </div>
+            </div>
+
+            <!--/*
+              Template cloned by admin.js when "Thêm ngày" is clicked. __INDEX__ is swapped for the
+              next free index so Spring's indexed binding stays contiguous.
+            */-->
+            <template id="itinerary-template">
+                <div class="itinerary-row">
+                    <span class="itinerary-day">Ngày <span class="itinerary-day-number">1</span></span>
+                    <input class="field-input" type="text" placeholder="Tiêu đề ngày"
+                           name="itinerary[__INDEX__].title">
+                    <input class="field-input" type="text" placeholder="Mô tả hoạt động trong ngày"
+                           name="itinerary[__INDEX__].description">
+                    <button class="btn btn--sm btn--danger" type="button" data-remove-itinerary>×</button>
+                </div>
+            </template>
+
+            <button class="btn btn--ghost btn--sm" type="button" id="add-itinerary">+ Thêm ngày</button>
+        </div>
+
+        <div class="field">
+            <label class="field-label">Ảnh tour</label>
+
+            <div class="image-grid" th:if="${!#lists.isEmpty(tourForm.keptImageUrls)}">
+                <div class="image-item" th:each="url, imageStat : *{keptImageUrls}">
+                    <img th:src="${url}" alt="Ảnh tour">
+                    <!--/* Hidden input, not th:field: removing the tile must drop the url from the submit entirely. */-->
+                    <input type="hidden" name="keptImageUrls" th:value="${url}">
+                    <label class="image-thumb-pick">
+                        <input type="radio" name="thumbnailUrl" th:value="${url}"
+                               th:checked="${url == tourForm.thumbnailUrl}">
+                        <span>Ảnh đại diện</span>
+                    </label>
+                    <button class="btn btn--sm btn--danger image-remove" type="button" data-remove-image>×</button>
+                </div>
+            </div>
+
+            <div class="upload-box">
+                <input type="file" id="newImages" name="newImages" multiple accept="image/*">
+                <label for="newImages">+ Tải ảnh</label>
+                <span class="upload-hint">JPG, PNG, WEBP hoặc GIF, tối đa 5MB mỗi ảnh</span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Lưu tour</button>
+            <a class="btn btn--ghost" th:href="@{/admin/tours}">Hủy</a>
+        </div>
+    </form>
+
+</div>
+</body>
+</html>

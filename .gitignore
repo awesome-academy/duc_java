@@ -34,3 +34,6 @@ build/
 
 ### Environment ###
 .env
+
+# Admin portal image uploads (tripgo.upload.dir) — runtime data, not source
+uploads/

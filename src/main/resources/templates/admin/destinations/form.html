@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{admin/layout :: layout(${editing} ? 'Sửa Điểm đến' : 'Thêm Điểm đến', ~{:: #page})}">
+<body>
+<div id="page">
+
+    <form class="panel form"
+          th:action="${editing} ? @{/admin/destinations/{id}(id=${destinationForm.id})} : @{/admin/destinations}"
+          th:object="${destinationForm}" method="post" enctype="multipart/form-data" novalidate>
+
+        <div class="alert alert--danger" th:if="${#fields.hasGlobalErrors()}">
+            <p th:each="error : ${#fields.globalErrors()}" th:text="${error}">Lỗi</p>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="name">Tên điểm đến <span class="req">*</span></label>
+            <input class="field-input" id="name" type="text" th:field="*{name}"
+                   th:errorclass="is-invalid" placeholder="Đà Nẵng">
+            <p class="field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></p>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="description">Mô tả</label>
+            <textarea class="field-input field-textarea" id="description" rows="4"
+                      th:field="*{description}" th:errorclass="is-invalid"></textarea>
+            <p class="field-error" th:if="${#fields.hasErrors('description')}" th:errors="*{description}"></p>
+        </div>
+
+        <div class="field">
+            <label class="field-label">Ảnh đại diện</label>
+
+            <div class="image-grid" th:if="${destinationForm.keptImageUrl}">
+                <div class="image-item">
+                    <img th:src="*{keptImageUrl}" alt="Ảnh điểm đến">
+                    <input type="hidden" th:field="*{keptImageUrl}">
+                    <button class="btn btn--sm btn--danger image-remove" type="button" data-remove-image>×</button>
+                </div>
+            </div>
+
+            <div class="upload-box">
+                <input type="file" id="newImage" th:field="*{newImage}" accept="image/*">
+                <label for="newImage">+ Tải ảnh</label>
+                <span class="upload-hint">Ảnh mới sẽ thay thế ảnh hiện tại</span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Lưu điểm đến</button>
+            <a class="btn btn--ghost" th:href="@{/admin/destinations}">Hủy</a>
+        </div>
+    </form>
+
+</div>
+</body>
+</html>

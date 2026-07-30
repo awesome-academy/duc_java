@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Đăng nhập · TripGo Admin</title>
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+</head>
+<body class="login-page">
+
+<div class="login-card">
+    <h1 class="login-title">TripGo Admin</h1>
+
+    <div class="alert alert--danger" th:if="${param.error}">
+        Email hoặc mật khẩu không đúng.
+    </div>
+    <div class="alert alert--success" th:if="${param.logout}">
+        Bạn đã đăng xuất.
+    </div>
+
+    <form th:action="@{/admin/login}" method="post" novalidate>
+        <div class="field">
+            <label class="field-label" for="email">Email</label>
+            <input class="field-input" type="email" id="email" name="email" required autofocus
+                   autocomplete="username">
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="password">Mật khẩu</label>
+            <input class="field-input" type="password" id="password" name="password" required
+                   autocomplete="current-password">
+        </div>
+
+        <button class="btn btn--primary btn--block" type="submit">Đăng nhập</button>
+    </form>
+</div>
+
+<p class="login-hint">Chỉ tài khoản role = admin mới đăng nhập được</p>
+
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{admin/layout :: layout('Quản lý Điểm đến', ~{:: #page})}">
+<body>
+<div id="page">
+
+    <div class="toolbar">
+        <span></span>
+        <a class="btn btn--primary" th:href="@{/admin/destinations/new}">+ Thêm điểm đến</a>
+    </div>
+
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Ảnh</th>
+            <th>Tên điểm đến</th>
+            <th>Slug</th>
+            <th>Mô tả</th>
+            <th class="ta-right">Thao tác</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="destination : ${destinations}">
+            <td>
+                <img class="thumb" th:if="${destination.imageUrl}" th:src="${destination.imageUrl}"
+                     alt="Ảnh điểm đến">
+                <span th:unless="${destination.imageUrl}" class="cell-sub">—</span>
+            </td>
+            <td class="cell-strong" th:text="${destination.name}">Đà Nẵng</td>
+            <td class="cell-sub" th:text="${destination.slug}">da-nang</td>
+            <td th:text="${#strings.abbreviate(destination.description ?: '—', 80)}">Mô tả</td>
+            <td class="ta-right">
+                <div class="row-actions">
+                    <a class="btn btn--sm btn--ghost"
+                       th:href="@{/admin/destinations/{id}/edit(id=${destination.id})}">Sửa</a>
+                    <form th:action="@{/admin/destinations/{id}/delete(id=${destination.id})}" method="post"
+                          th:data-confirm="|Xóa điểm đến &quot;${destination.name}&quot;?|">
+                        <button class="btn btn--sm btn--danger" type="submit">Xóa</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(destinations)}">
+            <td colspan="5" class="empty">Chưa có điểm đến nào.</td>
+        </tr>
+        </tbody>
+    </table>
+
+</div>
+</body>
+</html>

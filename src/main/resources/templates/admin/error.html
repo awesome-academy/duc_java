@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{admin/layout :: layout(${errorTitle}, ~{:: #page})}">
+<body>
+<div id="page">
+
+    <section class="panel panel--message">
+        <h2 class="panel-title" th:text="${errorTitle}">Đã có lỗi xảy ra</h2>
+        <p class="panel-text" th:text="${errorDetail}">Vui lòng thử lại.</p>
+        <a class="btn btn--primary" th:href="@{/admin}">Về Dashboard</a>
+    </section>
+
+</div>
+</body>
+</html>

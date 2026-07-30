@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Không có quyền truy cập · TripGo Admin</title>
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+</head>
+<!--/*
+  Standalone, not wrapped in the admin layout: whoever lands here is signed in but is not an
+  admin, so rendering the admin sidebar for them would be misleading.
+*/-->
+<body class="login-page">
+
+<div class="login-card">
+    <h1 class="login-title">403</h1>
+    <p class="panel-text">Tài khoản của bạn không có quyền truy cập khu vực quản trị.</p>
+    <form th:action="@{/admin/logout}" method="post">
+        <button class="btn btn--primary btn--block" type="submit">Đăng xuất</button>
+    </form>
+</div>
+
+</body>
+</html>

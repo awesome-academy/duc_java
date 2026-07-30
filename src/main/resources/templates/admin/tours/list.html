@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{admin/layout :: layout('Quản lý Tour', ~{:: #page})}">
+<body>
+<div id="page">
+
+    <div class="toolbar">
+        <form class="toolbar-search" th:action="@{/admin/tours}" method="get">
+            <input class="field-input" type="search" name="q" th:value="${q}"
+                   placeholder="Tìm tour theo tên / điểm đến...">
+            <button class="btn btn--ghost" type="submit">Tìm</button>
+        </form>
+        <a class="btn btn--primary" th:href="@{/admin/tours/new}">+ Thêm tour</a>
+    </div>
+
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Tên tour</th>
+            <th>Điểm đến</th>
+            <th>Loại hình</th>
+            <th class="ta-right">Giá</th>
+            <th>Thời lượng</th>
+            <th>Đánh giá</th>
+            <th>Trạng thái</th>
+            <th class="ta-right">Thao tác</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="tour : ${tours}">
+            <td class="cell-strong" th:text="${tour.title}">Đà Nẵng - Hội An 3N2Đ</td>
+            <td th:text="${tour.destinationName} ?: '—'">Đà Nẵng</td>
+            <td th:text="${tour.categoryName} ?: '—'">Biển</td>
+            <td class="ta-right cell-money">
+                <span th:text="${#numbers.formatInteger(tour.effectivePrice, 1, 'POINT')} + 'đ'">4.490.000đ</span>
+                <del class="cell-strike" th:if="${tour.discountPrice != null}"
+                     th:text="${#numbers.formatInteger(tour.price, 1, 'POINT')} + 'đ'">5.000.000đ</del>
+            </td>
+            <td th:text="${tour.durationDays} + ' ngày'">3 ngày</td>
+            <td>★ <span th:text="${#numbers.formatDecimal(tour.ratingAvg, 1, 1)}">4.7</span></td>
+            <td>
+                <span class="badge" th:classappend="' badge--' + ${#strings.toLowerCase(tour.status)}"
+                      th:text="${tour.status}">ACTIVE</span>
+            </td>
+            <td class="ta-right">
+                <div class="row-actions">
+                    <a class="btn btn--sm btn--ghost" th:href="@{/admin/tours/{id}/edit(id=${tour.id})}">Sửa</a>
+                    <form th:action="@{/admin/tours/{id}/delete(id=${tour.id})}" method="post"
+                          th:data-confirm="|Xóa tour &quot;${tour.title}&quot;? Tour sẽ không còn hiển thị trên API công khai.|">
+                        <button class="btn btn--sm btn--danger" type="submit">Xóa</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(tours)}">
+            <td colspan="8" class="empty">Không có tour nào khớp điều kiện tìm kiếm.</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <nav class="pagination" th:if="${pageInfo.totalPages > 1}">
+        <a th:each="number : ${#numbers.sequence(1, pageInfo.totalPages)}"
+           class="pagination-item"
+           th:classappend="${number == pageInfo.page} ? ' is-active'"
+           th:href="@{/admin/tours(q=${q}, page=${number})}"
+           th:text="${number}">1</a>
+    </nav>
+
+</div>
+</body>
+</html>
