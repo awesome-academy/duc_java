@@ -5,6 +5,7 @@ import com.tripgoapi.application.port.in.DeleteDestinationUseCase;
 import com.tripgoapi.application.port.in.GetAdminDestinationsUseCase;
 import com.tripgoapi.application.port.in.SaveDestinationCommand;
 import com.tripgoapi.application.port.in.UpdateDestinationUseCase;
+import com.tripgoapi.domain.exception.ConflictException;
 import com.tripgoapi.domain.exception.UnprocessableException;
 import com.tripgoapi.infrastructure.adapter.in.admin.form.DestinationForm;
 import jakarta.validation.Valid;
@@ -113,8 +114,12 @@ public class AdminDestinationController {
 
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        deleteDestinationUseCase.deleteDestination(id);
-        redirectAttributes.addFlashAttribute("successMessage", "Đã xóa điểm đến");
+        try {
+            deleteDestinationUseCase.deleteDestination(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Đã xóa điểm đến");
+        } catch (ConflictException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
         return "redirect:/admin/destinations";
     }
 

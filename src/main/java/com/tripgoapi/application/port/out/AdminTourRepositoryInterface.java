@@ -24,7 +24,11 @@ public interface AdminTourRepositoryInterface {
 
     Optional<AdminTourDetail> findById(Long id);
 
-    /** True when another (non-deleted) tour already owns this slug. */
+    /**
+     * True when another tour already owns this slug — DELETED ones included, since the unique
+     * index on slug does not know about soft deletes either. Do not add a status filter here: doing
+     * so would let a new tour reuse a DELETED tour's slug and fail at insert time on that index.
+     */
     boolean existsBySlug(String slug, Long excludeTourId);
 
     /**

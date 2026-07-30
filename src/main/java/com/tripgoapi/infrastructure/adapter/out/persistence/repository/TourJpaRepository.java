@@ -41,12 +41,17 @@ public interface TourJpaRepository extends JpaRepository<TourEntity, Long>, JpaS
      *
      * <p>The join on destination is LEFT, and its name coalesced to "", so a tour with no
      * destination still shows up in the unfiltered list and can still match on its title.
+     *
+     * <p>{@code pattern} has its own {@code %}/{@code _}/{@code \} escaped by the caller before
+     * being wrapped in wildcards, so {@code ESCAPE '\'} here treats them as literals instead of
+     * LIKE metacharacters.
      */
     @EntityGraph(attributePaths = {"destination", "category"})
     @Query("""
             SELECT t FROM TourEntity t LEFT JOIN t.destination d
             WHERE t.status <> 'DELETED'
-              AND (LOWER(t.title) LIKE :pattern OR LOWER(COALESCE(d.name, '')) LIKE :pattern)
+              AND (LOWER(t.title) LIKE :pattern ESCAPE '\\'
+                   OR LOWER(COALESCE(d.name, '')) LIKE :pattern ESCAPE '\\')
             """)
     Page<TourEntity> searchForAdmin(@Param("pattern") String pattern, Pageable pageable);
 
@@ -67,9 +72,17 @@ public interface TourJpaRepository extends JpaRepository<TourEntity, Long>, JpaS
     @Query("UPDATE TourEntity t SET t.status = 'DELETED' WHERE t.id = :id AND t.status <> 'DELETED'")
     int softDelete(@Param("id") Long id);
 
-    // Recomputes both derived columns straight from the reviews table in a single statement,
-    // rather than incrementing counters in application code — immune to drift regardless of how
-    // many reviews already exist or how many inserts race concurrently.
+    /**
+     * Recomputes both derived columns straight from the reviews table in a single statement,
+     * rather than incrementing counters in application code.
+     *
+     * <p>This is <b>not</b> immune to drift under READ COMMITTED on its own: when this UPDATE is
+     * blocked by a concurrent one on the same row and then unblocked via Postgres's EvalPlanQual,
+     * the subqueries in the SET clause still run against the transaction's original snapshot, so a
+     * review committed just before could be missed. Callers must serialize per-tour themselves via
+     * {@link #lockActiveTourForReview} (see {@code CreateReviewService}) — do not remove that lock
+     * on the assumption this statement is safe by itself.
+     */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE tours

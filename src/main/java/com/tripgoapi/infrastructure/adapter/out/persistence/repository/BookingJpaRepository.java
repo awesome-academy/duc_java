@@ -37,7 +37,6 @@ public interface BookingJpaRepository extends JpaRepository<BookingEntity, Long>
     // BookingRepositoryInterface#existsReviewEligibleBooking for why).
     boolean existsByUser_IdAndTour_IdAndStatusInAndDeparture_DepartureDateLessThanEqual(
             Long userId, Long tourId, List<String> statuses, LocalDate onOrBeforeDate);
-    boolean existsByUser_IdAndTour_IdAndStatusIn(Long userId, Long tourId, List<String> statuses);
 
     // --- Admin portal ---
 
@@ -47,7 +46,7 @@ public interface BookingJpaRepository extends JpaRepository<BookingEntity, Long>
             countQuery = "SELECT COUNT(b) FROM BookingEntity b WHERE (:status IS NULL OR b.status = :status)")
     Page<BookingEntity> searchForAdmin(@Param("status") String status, Pageable pageable);
 
-    @Modifying(clearAutomatically = true)
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE BookingEntity b SET b.status = 'CONFIRMED' WHERE b.id = :id AND b.status = 'PENDING'")
     int confirmIfPending(@Param("id") Long id);
 

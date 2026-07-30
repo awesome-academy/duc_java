@@ -8,6 +8,7 @@ import com.tripgoapi.domain.model.AdminTourDetail;
 import com.tripgoapi.domain.model.AdminTourSummary;
 import com.tripgoapi.domain.model.TourImage;
 import com.tripgoapi.domain.model.TourItineraryDay;
+import com.tripgoapi.domain.exception.InvalidTourDataException;
 import com.tripgoapi.domain.model.TourStatus;
 import com.tripgoapi.infrastructure.adapter.out.persistence.entity.CategoryEntity;
 import com.tripgoapi.infrastructure.adapter.out.persistence.entity.DestinationEntity;
@@ -116,17 +117,33 @@ public class AdminTourPersistenceAdapter implements AdminTourRepositoryInterface
     /**
      * "%" matches every row, which is what an empty search box should do. Lowercased here to pair
      * with the LOWER(...) on both columns in the query.
+     *
+     * <p>{@code \}, {@code %} and {@code _} in the keyword are escaped before being wrapped in
+     * wildcards, so a literal {@code %} or {@code _} typed into the search box is matched as itself
+     * rather than acting as a LIKE wildcard (paired with {@code ESCAPE '\'} in the query).
      */
     private String likePattern(String keyword) {
-        return keyword == null || keyword.isBlank()
-                ? "%"
-                : "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
+        if (keyword == null || keyword.isBlank()) {
+            return "%";
+        }
+        String escaped = keyword.trim().toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        return "%" + escaped + "%";
     }
 
     private void applyCommand(TourEntity entity, SaveTourCommand command) {
         entity.setTitle(command.title());
         entity.setDescription(command.description());
-        // getReferenceById, not a findById round-trip: only the FK value is needed here.
+        // getReferenceById, not a findById round-trip: only the FK value is needed here. Existence
+        // is checked explicitly first — getReferenceById returns a lazy proxy that only fails at
+        // flush time with a DataIntegrityViolationException (FK), which the controller cannot turn
+        // into a field error the way it does for UnprocessableException.
+        if (command.destinationId() != null && !destinationJpaRepository.existsById(command.destinationId())) {
+            throw new InvalidTourDataException("Điểm đến không còn tồn tại");
+        }
+        if (command.categoryId() != null && !categoryJpaRepository.existsById(command.categoryId())) {
+            throw new InvalidTourDataException("Danh mục không còn tồn tại");
+        }
         entity.setDestination(command.destinationId() == null
                 ? null : destinationJpaRepository.getReferenceById(command.destinationId()));
         entity.setCategory(command.categoryId() == null

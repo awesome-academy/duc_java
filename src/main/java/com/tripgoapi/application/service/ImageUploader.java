@@ -16,6 +16,13 @@ import java.util.Set;
  * Shared upload guard for the admin forms: enforces the image allowlist and size cap before any
  * bytes reach storage. Content-type is checked here rather than in the web adapter so the rule
  * holds for every driving adapter, not just the Thymeleaf one.
+ *
+ * <p><b>Not content validation.</b> {@code image.contentType()} is the multipart part's
+ * Content-Type header, which the client sets — curl/Postman can label a {@code .html} or
+ * {@code .jsp} file {@code image/png} and sail through this allowlist. The guard that actually
+ * matters is the file extension allowlist in {@code LocalFileStorageAdapter.extensionOf()}: stored
+ * filenames are always replaced with a UUID plus an extension picked from a fixed list, never the
+ * client-supplied name. This check is defence-in-depth on top of that, not a substitute for it.
  */
 @Service
 @RequiredArgsConstructor
